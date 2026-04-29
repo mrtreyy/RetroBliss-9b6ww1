@@ -37,7 +37,7 @@
     padding: 0;
   }
   html {
-    background: #080612;
+    background: #0a0a18;
   }
   body {
     @apply bg-background text-foreground;
@@ -48,8 +48,7 @@
     max-width: 480px;
     margin: 0 auto;
     min-height: 100vh;
-    position: relative;
-    background: #080612;
+    background: #0a0a18;
   }
   #root {
     min-height: 100vh;
@@ -58,42 +57,52 @@
   }
 }
 
-/* Mapbox overrides */
+/* ── Mapbox overrides ── */
 .mapboxgl-map { font-family: 'Poppins', sans-serif !important; }
 .mapboxgl-ctrl-logo { display: none !important; }
 .mapboxgl-ctrl-attrib { display: none !important; }
-.mapboxgl-ctrl-group { background: rgba(255,255,255,0.08) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 12px !important; }
-.mapboxgl-ctrl-group button { color: white !important; }
+.mapboxgl-ctrl-group {
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+}
+.mapboxgl-ctrl-group button {
+  color: white !important;
+  background: transparent !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
 .mapboxgl-popup-content {
-  background: rgba(15,8,30,0.92) !important;
+  background: rgba(15,8,30,0.95) !important;
   backdrop-filter: blur(20px) !important;
   border: 1px solid rgba(255,255,255,0.1) !important;
   border-radius: 16px !important;
   color: white !important;
   padding: 12px 16px !important;
   font-family: 'Poppins', sans-serif !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
 }
 .mapboxgl-popup-tip { display: none !important; }
 
-/* Scrollbar */
+/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.3); border-radius: 4px; }
 
 /* ── iOS 26 Glass System ── */
 .glass {
-  background: rgba(255,255,255,0.045);
+  background: rgba(255,255,255,0.05);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
 .glass-card {
-  background: rgba(255,255,255,0.055);
+  background: rgba(255,255,255,0.06);
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 28px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
 }
 
 .glass-strong {
@@ -104,16 +113,16 @@
 }
 
 .glass-dark {
-  background: rgba(8,6,18,0.75);
+  background: rgba(8,6,18,0.82);
   backdrop-filter: blur(30px) saturate(180%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.07);
 }
 
 /* ── Neon Glows ── */
-.glow-purple { box-shadow: 0 0 24px rgba(139,92,246,0.45), 0 0 48px rgba(139,92,246,0.18); }
-.glow-pink { box-shadow: 0 0 24px rgba(236,72,153,0.45), 0 0 48px rgba(236,72,153,0.18); }
-.glow-yellow { box-shadow: 0 0 24px rgba(245,158,11,0.45), 0 0 48px rgba(245,158,11,0.18); }
+.glow-purple { box-shadow: 0 0 24px rgba(139,92,246,0.4), 0 0 48px rgba(139,92,246,0.15); }
+.glow-pink { box-shadow: 0 0 24px rgba(236,72,153,0.4), 0 0 48px rgba(236,72,153,0.15); }
+.glow-yellow { box-shadow: 0 0 24px rgba(245,158,11,0.4), 0 0 48px rgba(245,158,11,0.15); }
 
 /* ── Gradient Buttons ── */
 .btn-gradient {
@@ -137,28 +146,13 @@
 }
 .btn-gradient:hover::before { left: 100%; }
 .btn-gradient:hover {
-  filter: brightness(1.12);
+  filter: brightness(1.1);
   box-shadow: 0 10px 36px rgba(139,92,246,0.55), 0 4px 16px rgba(236,72,153,0.3);
-  transform: translateY(-2px) scale(1.01);
+  transform: translateY(-1px) scale(1.01);
 }
 .btn-gradient:active {
   transform: translateY(0) scale(0.99);
   filter: brightness(0.96);
-}
-
-.btn-ghost {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-  color: rgba(255,255,255,0.75);
-  font-family: 'Poppins', sans-serif;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-radius: 16px;
-}
-.btn-ghost:hover {
-  background: rgba(255,255,255,0.1);
-  color: white;
 }
 
 /* ── Input ── */
@@ -178,9 +172,9 @@
   appearance: none;
 }
 .rb-input:focus {
-  border-color: rgba(139,92,246,0.65);
-  box-shadow: 0 0 0 4px rgba(139,92,246,0.12);
-  background: rgba(255,255,255,0.075);
+  border-color: rgba(139,92,246,0.6);
+  box-shadow: 0 0 0 4px rgba(139,92,246,0.1);
+  background: rgba(255,255,255,0.08);
 }
 .rb-input::placeholder { color: rgba(255,255,255,0.28); }
 .rb-input option { background: #12091f; color: white; }
@@ -240,8 +234,8 @@
   to { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(0.94); }
 }
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(139,92,246,0.4); }
-  50% { box-shadow: 0 0 40px rgba(139,92,246,0.75), 0 0 70px rgba(236,72,153,0.3); }
+  0%, 100% { box-shadow: 0 0 20px rgba(139,92,246,0.35); }
+  50% { box-shadow: 0 0 40px rgba(139,92,246,0.7), 0 0 70px rgba(236,72,153,0.25); }
 }
 @keyframes spin-smooth {
   from { transform: rotate(0deg); }
@@ -251,19 +245,9 @@
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-8px); }
 }
-@keyframes float2 {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-5px) rotate(3deg); }
-}
 @keyframes road-dash {
   from { background-position: 0 0; }
   to { background-position: 48px 0; }
-}
-@keyframes car-zoom {
-  0% { transform: translateX(-80px) scaleX(1); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateX(calc(100vw + 80px)) scaleX(1); opacity: 0; }
 }
 @keyframes shimmer-move {
   0% { background-position: -400px 0; }
@@ -281,17 +265,15 @@
   from { transform: translateY(100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
-@keyframes slide-down {
-  from { transform: translateY(-100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
 @keyframes glow-pulse {
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
-@keyframes orbit {
-  from { transform: rotate(0deg) translateX(60px) rotate(0deg); }
-  to { transform: rotate(360deg) translateX(60px) rotate(-360deg); }
+@keyframes car-drive {
+  0% { transform: translateX(-80px); opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { transform: translateX(calc(100vw + 80px)); opacity: 0; }
 }
 @keyframes progress-shine {
   0% { left: -100%; }
@@ -305,81 +287,8 @@
 .animate-float { animation: float 3.5s ease-in-out infinite; }
 .animate-spin { animation: spin-smooth 1s linear infinite; }
 
-/* ── Bottom Nav ── */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  background: rgba(8,6,18,0.85);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
-  border-top: 1px solid rgba(255,255,255,0.07);
-  padding: 10px 0 max(env(safe-area-inset-bottom), 10px);
-  z-index: 100;
-}
-
-/* ── iOS 26 Status Bar ── */
-.ios-status {
-  height: max(env(safe-area-inset-top), 44px);
-  display: flex;
-  align-items: flex-end;
-  padding-bottom: 8px;
-  padding-left: 20px;
-  padding-right: 20px;
-}
-
-/* ── Map Overlay Inputs ── */
-.map-input-overlay {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  z-index: 10;
-  padding: 16px;
-  background: linear-gradient(to bottom, rgba(8,6,18,0.95) 60%, transparent);
-}
-
-/* ── Pull Handle ── */
-.pull-handle {
-  width: 36px;
-  height: 4px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 2px;
-  margin: 0 auto 16px;
-}
-
-/* ── Stat cards ── */
-.stat-glow-purple { box-shadow: inset 0 0 30px rgba(139,92,246,0.1), 0 4px 24px rgba(139,92,246,0.2); }
-.stat-glow-pink { box-shadow: inset 0 0 30px rgba(236,72,153,0.1), 0 4px 24px rgba(236,72,153,0.2); }
-.stat-glow-yellow { box-shadow: inset 0 0 30px rgba(245,158,11,0.1), 0 4px 24px rgba(245,158,11,0.2); }
-.stat-glow-green { box-shadow: inset 0 0 30px rgba(34,197,94,0.1), 0 4px 24px rgba(34,197,94,0.2); }
-
-/* ── Mapbox search ── */
-.mapboxgl-ctrl-geocoder {
-  background: rgba(255,255,255,0.08) !important;
-  backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
-  border-radius: 16px !important;
-  box-shadow: none !important;
-  color: white !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  font-family: 'Poppins', sans-serif !important;
-}
-.mapboxgl-ctrl-geocoder input {
-  color: white !important;
-  font-family: 'Poppins', sans-serif !important;
-  background: transparent !important;
-  padding: 8px 36px !important;
-  font-size: 14px !important;
-}
-.mapboxgl-ctrl-geocoder input::placeholder { color: rgba(255,255,255,0.35) !important; }
-.mapboxgl-ctrl-geocoder .suggestions { 
-  background: rgba(15,8,30,0.95) !important;
-  border-radius: 14px !important;
-  border: 1px solid rgba(255,255,255,0.1) !important;
-  backdrop-filter: blur(20px) !important;
-}
-.mapboxgl-ctrl-geocoder .suggestions li a { color: white !important; font-family: 'Poppins', sans-serif !important; }
-.mapboxgl-ctrl-geocoder--icon { fill: rgba(255,255,255,0.4) !important; }
+/* ── Stat glow cards ── */
+.stat-glow-purple { box-shadow: inset 0 0 30px rgba(139,92,246,0.08), 0 4px 20px rgba(139,92,246,0.18); }
+.stat-glow-pink { box-shadow: inset 0 0 30px rgba(236,72,153,0.08), 0 4px 20px rgba(236,72,153,0.18); }
+.stat-glow-yellow { box-shadow: inset 0 0 30px rgba(245,158,11,0.08), 0 4px 20px rgba(245,158,11,0.18); }
+.stat-glow-green { box-shadow: inset 0 0 30px rgba(34,197,94,0.08), 0 4px 20px rgba(34,197,94,0.18); }

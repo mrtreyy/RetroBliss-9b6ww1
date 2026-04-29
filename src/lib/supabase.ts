@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Public Mapbox token: pk.eyJ1IjoicGVhY2U1NDMiLCJhIjoiY21vaHMwYzI2MDc3NjJycXZhdzFsb2ZyeiJ9.9nX4dOizNfUbny-D06iOBQ
+// No secret keys stored here
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -73,6 +76,10 @@ export async function setPlatformSetting(key: string, value: unknown): Promise<v
 export async function getCEOWallet() {
   const { data } = await supabase.from('rb_ceo_wallet').select('*').eq('id', 1).single();
   return data || { id: 1, balance: 0, total_earned: 0, total_withdrawn: 0 };
+}
+
+export async function setCEOWalletField(field: string, value: number) {
+  await supabase.from('rb_ceo_wallet').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', 1);
 }
 
 export async function updateCEOWallet(updates: { balance?: number; total_earned?: number; total_withdrawn?: number }) {
