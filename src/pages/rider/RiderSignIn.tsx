@@ -11,11 +11,12 @@ const CEO_USERNAME_ALT = 'retrobliss admin';
 interface RiderSignInProps {
   onLogin: (rider: Rider) => void;
   onSignUp: () => void;
-  onBack: () => void;
+  onBack?: () => void;
   onCEODetected: () => void;
+  onDriverPortal: () => void;
 }
 
-const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, onCEODetected }) => {
+const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, onCEODetected, onDriverPortal }) => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -97,9 +98,25 @@ const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, on
       fontFamily: "'Poppins', sans-serif",
       overflowY: 'auto',
     }}>
-      <div style={{ padding: '52px 28px 40px', maxWidth: '440px', margin: '0 auto', width: '100%' }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '28px', fontFamily: "'Poppins', sans-serif', padding: 0" }}>
-          ← Back
+      <div style={{ padding: '52px 28px 40px', maxWidth: '440px', margin: '0 auto', width: '100%', position: 'relative' }}>
+        {/* Subtle Driver link - top right, almost invisible */}
+        <button
+          onClick={onDriverPortal}
+          style={{
+            position: 'absolute', top: '52px', right: '28px',
+            background: 'none', border: 'none',
+            color: 'rgba(255,255,255,0.15)',
+            cursor: 'pointer', fontSize: '12px',
+            fontFamily: "'Poppins', sans-serif",
+            fontWeight: 500,
+            letterSpacing: '0.05em',
+            padding: '4px 8px',
+            transition: 'color 0.2s',
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)'}
+          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.15)'}
+        >
+          Driver
         </button>
 
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '32px', animation: 'fadeInDown 0.5s ease' }}>

@@ -51,7 +51,7 @@ const App = () => {
         return;
       } catch { /* ignore */ }
     }
-    navigate('role-select');
+    navigate('rider-signin');
   };
 
   const handleLogout = () => {
@@ -60,7 +60,7 @@ const App = () => {
     localStorage.removeItem('rb_admin_session');
     setCurrentRider(null);
     setCurrentDriver(null);
-    navigate('role-select');
+    navigate('rider-signin');
   };
 
   const renderScreen = () => {
@@ -80,6 +80,7 @@ const App = () => {
             onSignUp={() => navigate('rider-signup')}
             onBack={() => navigate('role-select')}
             onCEODetected={() => navigate('ceo-password')}
+            onDriverPortal={() => navigate('driver-signin')}
           />
         );
       case 'rider-signup':
@@ -119,7 +120,7 @@ const App = () => {
               }
             }}
             onSignUp={() => navigate('driver-signup')}
-            onBack={() => navigate('role-select')}
+            onBack={() => navigate('rider-signin')}
             onCEODetected={() => navigate('ceo-password')}
           />
         );
@@ -165,7 +166,7 @@ const App = () => {
               localStorage.setItem('rb_admin_session', 'true');
               navigate('ceo-dashboard');
             }}
-            onBack={() => navigate('role-select')}
+            onBack={() => navigate('rider-signin')}
           />
         );
       case 'ceo-dashboard':

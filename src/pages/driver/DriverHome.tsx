@@ -2,9 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import MapboxMap from '@/components/MapboxMap';
 import NotificationSystem from '@/components/NotificationSystem';
 import ProfileAvatar from '@/components/ProfileAvatar';
+import ChatSupport from '@/pages/ChatSupport';
+import ContactOfficials from '@/pages/ContactOfficials';
+import AboutPage from '@/pages/AboutPage';
 import { supabase, generateId, logAuditDB, getClientIP, sendNotification, getPlatformSetting } from '@/lib/supabase';
 import type { Driver, Ride, Transaction } from '@/types';
 import { toast } from 'sonner';
+import { showLocalNotification, startReEngagementNotifications } from '@/lib/pushNotifications';
 
 interface DriverHomeProps {
   driver: Driver | null;
@@ -12,7 +16,7 @@ interface DriverHomeProps {
   onUpdateDriver: (d: Driver) => void;
 }
 
-type SubView = 'home' | 'wallet' | 'history' | 'profile' | 'active-ride';
+type SubView = 'home' | 'wallet' | 'history' | 'profile' | 'active-ride' | 'chat' | 'contact' | 'about';
 
 const NIGERIAN_COORDS: Record<string, [number, number]> = {
   'Lagos': [3.3792, 6.5244], 'Abuja': [7.4898, 9.0579],
@@ -40,6 +44,7 @@ const DriverHome: React.FC<DriverHomeProps> = ({ driver, onLogout, onUpdateDrive
   const [driverLocation, setDriverLocation] = useState<[number, number] | null>(null);
   const [avgRating, setAvgRating] = useState<number>(0);
   const [totalRides, setTotalRides] = useState(0);
+  const [sideMenuOpen, setSideMenuOpen] = useState(false);
   const gpsWatchRef = useRef<number | null>(null);
 
   const driverCoords: [number, number] = driverLocation || NIGERIAN_COORDS[driver?.state || 'Lagos'] || [3.3792, 6.5244];
@@ -51,6 +56,11 @@ const DriverHome: React.FC<DriverHomeProps> = ({ driver, onLogout, onUpdateDrive
     fetchNotifications();
     checkActiveRide();
     fetchDriverStats();
+
+    // Register SW + request notification permission
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    startReEngagementNotifications();
 
     const retentionVal = async () => {
       const v = await getPlatformSetting('driver_retention_percentage');
@@ -84,6 +94,7 @@ const DriverHome: React.FC<DriverHomeProps> = ({ driver, onLogout, onUpdateDrive
         const ride = payload.new as Record<string, unknown>;
         if (isOnline && !pendingRide && !activeRide) {
           setPendingRide(mapRideRow(ride));
+          showLocalNotification('🚨 New Ride Request!', `${ride.pickup} → ${ride.destination} · ₦${Number(ride.fare).toLocaleString()}`);
           toast.info('🚨 New ride request!', { description: `${ride.pickup} → ${ride.destination}` });
         }
       })
@@ -316,6 +327,21 @@ const DriverHome: React.FC<DriverHomeProps> = ({ driver, onLogout, onUpdateDrive
 
   if (!driver) return null;
 
+  // ── CHAT SUPPORT ──
+  if (subView === 'chat') {
+    return <ChatSupport userId={driver.id} userRole="driver" userName={driver.fullName} onBack={() => setSubView('home')} />;
+  }
+
+  // ── CONTACT OFFICIALS ──
+  if (subView === 'contact') {
+    return <ContactOfficials onBack={() => setSubView('home')} />;
+  }
+
+  // ── ABOUT ──
+  if (subView === 'about') {
+    return <AboutPage onBack={() => setSubView('home')} />;
+  }
+
   // ── ACTIVE RIDE VIEW ──
   if (subView === 'active-ride' && activeRide) {
     const pickupC = NIGERIAN_COORDS[activeRide.pickup] || [3.3792, 6.5244] as [number, number];
@@ -502,13 +528,56 @@ const DriverHome: React.FC<DriverHomeProps> = ({ driver, onLogout, onUpdateDrive
 
   // ── MAIN HOME ──
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a18', display: 'flex', flexDirection: 'column', fontFamily: "'Poppins', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#0a0a18', display: 'flex', flexDirection: 'column', fontFamily: "'Poppins', sans-serif", position: 'relative' }}>
       <NotificationSystem userId={driver.id} userRole="driver" />
+
+      {/* Side Menu */}
+      {sideMenuOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex' }}>
+          <div onClick={() => setSideMenuOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} />
+          <div style={{ position: 'relative', width: '72%', maxWidth: '300px', height: '100%', background: 'rgba(10,6,24,0.97)', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', padding: '56px 0 24px', animation: 'slideInLeft 0.3s cubic-bezier(0.34,1.56,0.64,1)' }}>
+            <div style={{ padding: '0 24px 24px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <ProfileAvatar name={driver.fullName} profilePic={driver.profilePic} size={52} />
+              <div>
+                <p style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: 0 }}>{driver.fullName}</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '2px 0 0' }}>@{driver.username} · Driver</p>
+              </div>
+            </div>
+            <div style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
+              {[
+                { icon: '👤', label: 'Profile', action: () => { setSideMenuOpen(false); setSubView('profile'); } },
+                { icon: '💬', label: 'RetroBliss Chat Support', action: () => { setSideMenuOpen(false); setSubView('chat'); } },
+                { icon: '📞', label: 'Contact Officials', action: () => { setSideMenuOpen(false); setSubView('contact'); } },
+                { icon: 'ℹ️', label: 'About RetroBliss', action: () => { setSideMenuOpen(false); setSubView('about'); } },
+              ].map(item => (
+                <button key={item.label} onClick={item.action} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 24px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Poppins', sans-serif", textAlign: 'left' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'none'}>
+                  <span style={{ fontSize: '20px', width: '28px', flexShrink: 0 }}>{item.icon}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', fontWeight: 500 }}>{item.label}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.07)', marginBottom: '8px' }}>
+              <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '14px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Wallet Balance</span>
+                <span style={{ color: '#FCD34D', fontWeight: 700, fontSize: '14px' }}>₦{walletBalance.toLocaleString()}</span>
+              </div>
+            </div>
+            <button onClick={() => { setSideMenuOpen(false); onLogout(); }} style={{ margin: '0 24px', padding: '14px', borderRadius: '16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: "'Poppins', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              🚚 Log Out
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ padding: '48px 20px 16px', maxWidth: '480px', margin: '0 auto', width: '100%' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
+            <button onClick={() => setSideMenuOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {[22, 16, 22].map((w, i) => (<div key={i} style={{ width: `${w}px`, height: '2px', background: 'rgba(255,255,255,0.6)', borderRadius: '1px' }} />))}
+            </button>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px', margin: '0 0 2px' }}>Driver Dashboard 🚗</p>
             <h2 style={{ color: 'white', fontSize: '22px', fontWeight: 800, margin: 0 }}>{driver.fullName.split(' ')[0]}</h2>
           </div>

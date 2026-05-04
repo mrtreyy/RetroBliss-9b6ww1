@@ -3,13 +3,15 @@ import MapboxMap from '@/components/MapboxMap';
 import NotificationSystem from '@/components/NotificationSystem';
 import ProfileAvatar from '@/components/ProfileAvatar';
 import { supabase, generateId, formatCurrency, logAuditDB, getClientIP, sendNotification, getPlatformSetting, setPlatformSetting, getCEOWallet, updateCEOWallet } from '@/lib/supabase';
+import { ALL_NIGERIAN_STATES } from '@/lib/nigerianLocations';
+import { showLocalNotification } from '@/lib/pushNotifications';
 import { toast } from 'sonner';
 
 interface CEODashboardProps {
   onLogout: () => void;
 }
 
-type CEOTab = 'dashboard' | 'riders' | 'drivers' | 'rides' | 'approvals' | 'earnings' | 'audit' | 'controls' | 'notifications' | 'withdrawals';
+type CEOTab = 'dashboard' | 'riders' | 'drivers' | 'rides' | 'approvals' | 'earnings' | 'audit' | 'controls' | 'notifications' | 'withdrawals' | 'broadcasts' | 'chat' | 'contact-settings';
 type DetailView = 'list' | 'detail';
 
 const NIGERIAN_COORDS: Record<string, [number, number]> = {
@@ -45,6 +47,16 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
   const [stats, setStats] = useState({ totalRiders: 0, totalDrivers: 0, activeRides: 0, todayRevenue: 0, pendingWithdrawals: 0 });
   const [activeRideMarkers, setActiveRideMarkers] = useState<{ id: string; lat: number; lng: number; label: string; color: string }[]>([]);
   const [newLocationsInput, setNewLocationsInput] = useState('');
+  const [broadcastMsg, setBroadcastMsg] = useState('');
+  const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'riders' | 'drivers'>('all');
+  const [chatMessages, setChatMessages] = useState<Record<string, unknown>[]>([]);
+  const [selectedChatUser, setSelectedChatUser] = useState<{ id: string; name: string; role: string } | null>(null);
+  const [chatReply, setChatReply] = useState('');
+  const [contactSettings, setContactSettings] = useState<Record<string, unknown>[]>([]);
+  const [newContactPlatform, setNewContactPlatform] = useState('');
+  const [newContactLabel, setNewContactLabel] = useState('');
+  const [newContactValue, setNewContactValue] = useState('');
+  const [availableNigerianStates, setAvailableNigerianStates] = useState<string[]>([]);
   const [replyMsg, setReplyMsg] = useState('');
   const [notifCount, setNotifCount] = useState(0);
 
@@ -58,7 +70,7 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
   }, []);
 
   const fetchAll = async () => {
-    await Promise.all([fetchRiders(), fetchDrivers(), fetchRides(), fetchAuditLogs(), fetchNotifications(), fetchWithdrawals(), fetchSettings(), fetchCEOWallet()]);
+    await Promise.all([fetchRiders(), fetchDrivers(), fetchRides(), fetchAuditLogs(), fetchNotifications(), fetchWithdrawals(), fetchSettings(), fetchCEOWallet(), fetchChatMessages(), fetchContactSettings()]);
     await fetchStats();
   };
 
@@ -110,9 +122,19 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
     if (rp !== null) setRetentionPct(Number(rp));
     if (bf !== null) setBaseFare(Number(bf));
     if (km !== null) setPerKmRate(Number(km));
-    if (Array.isArray(states)) setAvailableStates(states);
+    if (Array.isArray(states)) { setAvailableStates(states); setAvailableNigerianStates(states); }
     if (Array.isArray(locs)) setAvailableLocations(locs);
     if (typeof surge === 'boolean') setSurgeEnabled(surge);
+  };
+
+  const fetchChatMessages = async () => {
+    const { data } = await supabase.from('rb_chat_messages').select('*').order('created_at', { ascending: false }).limit(200);
+    setChatMessages(data || []);
+  };
+
+  const fetchContactSettings = async () => {
+    const { data } = await supabase.from('rb_contact_settings').select('*').order('created_at');
+    setContactSettings(data || []);
   };
   const fetchCEOWallet = async () => {
     const w = await getCEOWallet();
@@ -213,12 +235,89 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
     fetchWithdrawals();
   };
 
+  const handleBroadcast = async () => {
+    if (!broadcastMsg.trim()) { toast.error('Enter a broadcast message.'); return; }
+    const broadcastId = generateId();
+
+    // Insert into broadcasts table
+    await supabase.from('rb_broadcasts').insert({
+      id: broadcastId,
+      title: 'Message from RetroBliss Admin',
+      message: broadcastMsg,
+      target: broadcastTarget,
+      target_role: broadcastTarget,
+      sent_by: 'CEO Admin',
+      created_at: new Date().toISOString(),
+    });
+
+    // Send to all relevant users
+    if (broadcastTarget === 'all' || broadcastTarget === 'riders') {
+      const { data: riderList } = await supabase.from('rb_riders').select('id').eq('status', 'active');
+      for (const r of (riderList || [])) {
+        await sendNotification(r.id, 'rider', '📢 RetroBliss Announcement', broadcastMsg);
+      }
+    }
+    if (broadcastTarget === 'all' || broadcastTarget === 'drivers') {
+      const { data: driverList } = await supabase.from('rb_drivers').select('id').eq('status', 'active');
+      for (const d of (driverList || [])) {
+        await sendNotification(d.id, 'driver', '📢 RetroBliss Announcement', broadcastMsg);
+      }
+    }
+
+    const ip = await getClientIP();
+    await logAuditDB('CEO Admin', 'admin', 'broadcast_sent', broadcastId, { target: broadcastTarget, message: broadcastMsg }, ip, 'Nigeria');
+    showLocalNotification('📢 Broadcast Sent', `Message delivered to ${broadcastTarget === 'all' ? 'all users' : broadcastTarget}.`);
+    toast.success(`Broadcast sent to ${broadcastTarget === 'all' ? 'all users' : broadcastTarget}!`);
+    setBroadcastMsg('');
+  };
+
+  const handleSendChatReply = async () => {
+    if (!selectedChatUser || !chatReply.trim()) return;
+    // Insert CEO reply
+    await supabase.from('rb_chat_messages').insert({
+      id: generateId(),
+      user_id: selectedChatUser.id,
+      user_role: selectedChatUser.role,
+      user_name: 'CEO Admin',
+      sender: 'ceo',
+      message: chatReply,
+      read: false,
+      created_at: new Date().toISOString(),
+    });
+    // Push notification to user
+    await sendNotification(selectedChatUser.id, selectedChatUser.role, '💬 Reply from RetroBliss', chatReply);
+    toast.success('Reply sent!');
+    setChatReply('');
+    fetchChatMessages();
+  };
+
+  const handleAddContactSetting = async () => {
+    if (!newContactPlatform || !newContactLabel || !newContactValue) { toast.error('Fill all contact fields.'); return; }
+    await supabase.from('rb_contact_settings').insert({
+      id: generateId(),
+      platform: newContactPlatform.toLowerCase(),
+      label: newContactLabel,
+      value: newContactValue,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    });
+    toast.success('Contact channel added!');
+    setNewContactPlatform(''); setNewContactLabel(''); setNewContactValue('');
+    fetchContactSettings();
+  };
+
+  const handleDeleteContactSetting = async (id: string) => {
+    await supabase.from('rb_contact_settings').delete().eq('id', id);
+    toast.success('Contact removed.');
+    fetchContactSettings();
+  };
+
   const handleSaveSettings = async () => {
     await setPlatformSetting('driver_retention_percentage', retentionPct);
     await setPlatformSetting('base_fare', baseFare);
     await setPlatformSetting('per_km_rate', perKmRate);
     await setPlatformSetting('surge_enabled', surgeEnabled);
-    await setPlatformSetting('available_states', availableStates);
+    await setPlatformSetting('available_states', availableNigerianStates);
     await setPlatformSetting('available_locations', availableLocations);
     const ip = await getClientIP();
     await logAuditDB('CEO Admin', 'admin', 'settings_update', 'platform', { retention: retentionPct, base_fare: baseFare, per_km: perKmRate, states: availableStates, locations: availableLocations }, ip, 'Nigeria');
@@ -291,6 +390,9 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
     { key: 'audit', icon: '📋', label: 'Audit Log' },
     { key: 'controls', icon: '⚙️', label: 'Controls' },
     { key: 'notifications', icon: '🔔', label: `Notifs${notifCount > 0 ? ` (${notifCount})` : ''}` },
+    { key: 'broadcasts', icon: '📢', label: 'Broadcast' },
+    { key: 'chat', icon: '💬', label: 'Chat Support' },
+    { key: 'contact-settings', icon: '📞', label: 'Contact Info' },
   ];
 
   // ── DETAIL VIEW RENDERS ──
@@ -825,6 +927,30 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               </div>
             </div>
 
+            {/* Available Nigerian States - CEO sets which states have rides */}
+            <div className="glass-card" style={{ padding: '20px' }}>
+              <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 4px' }}>🗺️ Active Ride States</h3>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 14px' }}>Only riders in these states can book rides. Cities from these states will show in autocomplete.</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px', maxHeight: '200px', overflowY: 'auto' }}>
+                {ALL_NIGERIAN_STATES.map(state => (
+                  <button key={state} onClick={() => {
+                    setAvailableNigerianStates(prev =>
+                      prev.includes(state) ? prev.filter(s => s !== state) : [...prev, state]
+                    );
+                  }} style={{ padding: '6px 12px', borderRadius: '12px', background: availableNigerianStates.includes(state) ? 'linear-gradient(135deg, #8B5CF6, #EC4899)' : 'rgba(255,255,255,0.05)', border: availableNigerianStates.includes(state) ? 'none' : '1px solid rgba(255,255,255,0.08)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: availableNigerianStates.includes(state) ? 700 : 400, fontFamily: "'Poppins', sans-serif", transition: 'all 0.15s ease' }}>
+                    {state}
+                  </button>
+                ))}
+              </div>
+              {availableNigerianStates.length > 0 && (
+                <p style={{ color: '#C4B5FD', fontSize: '12px', margin: '0 0 14px' }}>✅ {availableNigerianStates.length} state{availableNigerianStates.length !== 1 ? 's' : ''} active: {availableNigerianStates.join(', ')}</p>
+              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setAvailableNigerianStates(ALL_NIGERIAN_STATES)} style={{ flex: 1, padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', fontFamily: "'Poppins', sans-serif" }}>Select All</button>
+                <button onClick={() => setAvailableNigerianStates([])} style={{ flex: 1, padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', fontFamily: "'Poppins', sans-serif" }}>Clear All</button>
+              </div>
+            </div>
+
             <div className="glass-card" style={{ padding: '20px' }}>
               <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 4px' }}>📍 Available Locations</h3>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 16px' }}>Riders can only book rides to/from these locations</p>
@@ -837,7 +963,7 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
                 ))}
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input className="rb-input" placeholder="Add new location..." value={newLocationsInput} onChange={e => setNewLocationsInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddLocation()} style={{ flex: 1, fontSize: '13px' }} />
+                <input className="rb-input" placeholder="Add specific location..." value={newLocationsInput} onChange={e => setNewLocationsInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddLocation()} style={{ flex: 1, fontSize: '13px' }} />
                 <button onClick={handleAddLocation} style={{ padding: '0 16px', borderRadius: '16px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 700, fontFamily: "'Poppins', sans-serif", flexShrink: 0 }}>+</button>
               </div>
             </div>
@@ -869,6 +995,127 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
                 </div>
               </div>
             ))}
+          </div>
+        );
+
+      case 'broadcasts':
+        return (
+          <div>
+            <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
+              <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 16px' }}>📢 Send Platform Broadcast</h3>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                {(['all', 'riders', 'drivers'] as const).map(t => (
+                  <button key={t} onClick={() => setBroadcastTarget(t)} style={{ flex: 1, padding: '10px', borderRadius: '14px', background: broadcastTarget === t ? 'linear-gradient(135deg, #8B5CF6, #EC4899)' : 'rgba(255,255,255,0.06)', border: broadcastTarget === t ? 'none' : '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 700, fontFamily: "'Poppins', sans-serif", textTransform: 'capitalize' }}>{t === 'all' ? '👥 All' : t === 'riders' ? '🛵 Riders' : '🚗 Drivers'}</button>
+                ))}
+              </div>
+              <textarea
+                value={broadcastMsg}
+                onChange={e => setBroadcastMsg(e.target.value)}
+                placeholder="Type your broadcast message here..."
+                rows={4}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '18px', color: 'white', fontSize: '14px', padding: '14px', fontFamily: "'Poppins', sans-serif", resize: 'none', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }}
+              />
+              <button onClick={handleBroadcast} style={{ width: '100%', padding: '15px', borderRadius: '16px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', fontSize: '15px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Poppins', sans-serif" }}>
+                📢 Send Broadcast to {broadcastTarget === 'all' ? 'Everyone' : broadcastTarget === 'riders' ? 'All Riders' : 'All Drivers'}
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'chat': {
+        // Group messages by user
+        const userChats = chatMessages.reduce((acc: Record<string, Record<string, unknown>[]>, msg: Record<string, unknown>) => {
+          const uid = msg.user_id as string;
+          if (!acc[uid]) acc[uid] = [];
+          acc[uid].push(msg);
+          return acc;
+        }, {});
+
+        if (selectedChatUser) {
+          const convoMsgs = (userChats[selectedChatUser.id] || []).sort((a, b) => new Date(a.created_at as string).getTime() - new Date(b.created_at as string).getTime());
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 200px)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <button onClick={() => setSelectedChatUser(null)} style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: '12px', padding: '8px 14px', color: 'white', cursor: 'pointer', fontFamily: "'Poppins', sans-serif", fontSize: '13px' }}>←</button>
+                <div>
+                  <p style={{ color: 'white', fontSize: '14px', fontWeight: 700, margin: 0 }}>{selectedChatUser.name}</p>
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: 0 }}>{selectedChatUser.role}</p>
+                </div>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '12px' }}>
+                {convoMsgs.map(msg => (
+                  <div key={msg.id as string} style={{ display: 'flex', justifyContent: (msg.sender as string) === 'ceo' ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ maxWidth: '78%', background: (msg.sender as string) === 'ceo' ? 'linear-gradient(135deg, #8B5CF6, #EC4899)' : 'rgba(255,255,255,0.08)', borderRadius: '16px', padding: '10px 14px' }}>
+                      <p style={{ color: 'white', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>{msg.message as string}</p>
+                      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', margin: '4px 0 0', textAlign: (msg.sender as string) === 'ceo' ? 'right' : 'left' }}>{new Date(msg.created_at as string).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input className="rb-input" placeholder="Reply..." value={chatReply} onChange={e => setChatReply(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendChatReply()} style={{ flex: 1, fontSize: '13px', padding: '12px 16px' }} />
+                <button onClick={handleSendChatReply} style={{ padding: '12px 16px', borderRadius: '14px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', flexShrink: 0 }}>➤</button>
+              </div>
+            </div>
+          );
+        }
+
+        const uniqueUsers = Object.entries(userChats).map(([uid, msgs]) => {
+          const lastMsg = msgs[0] as Record<string, unknown>;
+          const userMsg = msgs.find((m: Record<string, unknown>) => m.sender === 'user') as Record<string, unknown> | undefined;
+          return { id: uid, name: (userMsg?.user_name as string) || 'User', role: lastMsg?.user_role as string, lastMsg: lastMsg?.message as string, time: lastMsg?.created_at as string, unread: msgs.filter((m: Record<string, unknown>) => !m.read && m.sender !== 'ceo').length };
+        });
+
+        return (
+          <div>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 16px' }}>{uniqueUsers.length} active conversations</p>
+            {uniqueUsers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px' }}><p style={{ fontSize: '48px', margin: '0 0 12px' }}>💬</p><p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>No support messages yet</p></div>
+            ) : uniqueUsers.map(user => (
+              <button key={user.id} onClick={() => { setSelectedChatUser({ id: user.id, name: user.name, role: user.role }); fetchChatMessages(); }} style={{ width: '100%', textAlign: 'left', background: 'rgba(255,255,255,0.04)', border: user.unread > 0 ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.07)', borderRadius: '18px', padding: '14px 16px', marginBottom: '10px', cursor: 'pointer', fontFamily: "'Poppins', sans-serif", display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{user.role === 'driver' ? '🚗' : '🛵'}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                    <p style={{ color: 'white', fontSize: '13px', fontWeight: 700, margin: 0 }}>{user.name}</p>
+                    {user.unread > 0 && <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: 'white', fontSize: '10px', fontWeight: 700 }}>{user.unread}</span></div>}
+                  </div>
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.lastMsg}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        );
+      }
+
+      case 'contact-settings':
+        return (
+          <div>
+            <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
+              <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 16px' }}>➕ Add Contact Channel</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                {['whatsapp', 'telegram', 'instagram', 'twitter', 'email', 'phone', 'facebook', 'youtube', 'tiktok', 'linkedin'].map(p => (
+                  <button key={p} onClick={() => { setNewContactPlatform(p); setNewContactLabel(p.charAt(0).toUpperCase() + p.slice(1)); }} style={{ padding: '7px 14px', borderRadius: '12px', background: newContactPlatform === p ? 'linear-gradient(135deg, #8B5CF6, #EC4899)' : 'rgba(255,255,255,0.06)', border: newContactPlatform === p ? 'none' : '1px solid rgba(255,255,255,0.08)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600, fontFamily: "'Poppins', sans-serif", textTransform: 'capitalize' }}>{p}</button>
+                ))}
+              </div>
+              <input className="rb-input" placeholder="Label (e.g. WhatsApp Support)" value={newContactLabel} onChange={e => setNewContactLabel(e.target.value)} style={{ marginBottom: '10px', fontSize: '13px' }} />
+              <input className="rb-input" placeholder="Value (e.g. +2348012345678 or @username or link)" value={newContactValue} onChange={e => setNewContactValue(e.target.value)} style={{ marginBottom: '12px', fontSize: '13px' }} />
+              <button onClick={handleAddContactSetting} style={{ width: '100%', padding: '14px', borderRadius: '16px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Poppins', sans-serif" }}>Add Contact Channel</button>
+            </div>
+
+            {contactSettings.length > 0 && (
+              <>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 700, margin: '0 0 12px', letterSpacing: '0.08em' }}>ACTIVE CHANNELS</p>
+                {contactSettings.map(c => (
+                  <div key={c.id as string} className="glass" style={{ borderRadius: '16px', padding: '14px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <p style={{ color: 'white', fontSize: '13px', fontWeight: 600, margin: '0 0 2px' }}>{c.label as string}</p>
+                      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: 0 }}>{c.platform as string} · {c.value as string}</p>
+                    </div>
+                    <button onClick={() => handleDeleteContactSetting(c.id as string)} style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '6px 12px', color: '#FCA5A5', cursor: 'pointer', fontSize: '12px', fontFamily: "'Poppins', sans-serif" }}>Remove</button>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         );
 

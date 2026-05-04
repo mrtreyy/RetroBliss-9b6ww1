@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import RetroBlissLogo from '@/components/RetroBlissLogo';
 import { supabase, generateId, logAuditDB, getClientIP } from '@/lib/supabase';
 import CarTransitionAnimation from '@/components/CarTransitionAnimation';
+import RiderOnboarding from '@/pages/rider/RiderOnboarding';
 import type { Driver } from '@/types';
 import { toast } from 'sonner';
 
@@ -22,6 +23,8 @@ const DriverSignIn: React.FC<DriverSignInProps> = ({ onLogin, onSignUp, onBack, 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingDriver, setOnboardingDriver] = useState<Driver | null>(null);
 
   const handleSignIn = async () => {
     setError('');
@@ -76,18 +79,42 @@ const DriverSignIn: React.FC<DriverSignInProps> = ({ onLogin, onSignUp, onBack, 
         return;
       }
 
+      // Check if driver has seen onboarding (first login after approval)
+      const hasSeenOnboarding = localStorage.getItem(`rb_driver_onboarded_${d.id}`);
+      
       setLoading(false);
       setTransitioning(true);
 
       const ip = await getClientIP();
       await logAuditDB(d.username, 'driver', 'login', d.id, { email: d.email }, ip, d.state || 'Nigeria');
 
-      setTimeout(() => onLogin(driver), 100);
+      if (!hasSeenOnboarding) {
+        // Show 3 onboarding pages for newly approved drivers
+        setOnboardingDriver(driver);
+        setTimeout(() => {
+          setTransitioning(false);
+          setShowOnboarding(true);
+        }, 2200);
+      } else {
+        setTimeout(() => onLogin(driver), 100);
+      }
     } catch {
       setError('Something went wrong. Please try again.');
       setLoading(false);
     }
   };
+
+  if (showOnboarding && onboardingDriver) {
+    return (
+      <RiderOnboarding
+        rider={null}
+        onComplete={() => {
+          localStorage.setItem(`rb_driver_onboarded_${onboardingDriver.id}`, 'true');
+          onLogin(onboardingDriver);
+        }}
+      />
+    );
+  }
 
   if (transitioning) return <CarTransitionAnimation onComplete={() => {}} loadingText="Starting your shift..." />;
 
