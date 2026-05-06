@@ -11,22 +11,13 @@ interface CEODashboardProps {
   onLogout: () => void;
 }
 
-// Bottom nav tabs (7 primary + extras via scroll)
 type CEOTab = 'dashboard' | 'riders' | 'drivers' | 'rides' | 'approvals' | 'earnings' | 'audit' | 'controls' | 'notifications' | 'withdrawals' | 'broadcasts' | 'chat' | 'contact-settings';
-
-const NIGERIAN_COORDS: Record<string, [number, number]> = {
-  'Ikeja': [3.3488, 6.6018], 'Victoria Island': [3.4219, 6.4314],
-  'Lekki': [3.5561, 6.4478], 'Surulere': [3.3494, 6.5057],
-  'Yaba': [3.3796, 6.5159], 'Maitama': [7.5053, 9.0781],
-  'Lagos': [3.3792, 6.5244], 'Abuja': [7.4898, 9.0579],
-};
 
 const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState<CEOTab>('dashboard');
   const [selectedItem, setSelectedItem] = useState<Record<string, unknown> | null>(null);
   const [detailView, setDetailView] = useState(false);
 
-  // Data
   const [riders, setRiders] = useState<Record<string, unknown>[]>([]);
   const [drivers, setDrivers] = useState<Record<string, unknown>[]>([]);
   const [pendingDrivers, setPendingDrivers] = useState<Record<string, unknown>[]>([]);
@@ -37,7 +28,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
   const [chatMessages, setChatMessages] = useState<Record<string, unknown>[]>([]);
   const [contactSettings, setContactSettings] = useState<Record<string, unknown>[]>([]);
 
-  // Wallet & Settings
   const [ceoWallet, setCeoWallet] = useState({ balance: 0, total_earned: 0, total_withdrawn: 0, total_platform_volume: 0 });
   const [retentionPct, setRetentionPct] = useState(50);
   const [baseFare, setBaseFare] = useState(500);
@@ -49,7 +39,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
   const [ceoAcct, setCeoAcct] = useState('');
   const [ceoAcctName, setCeoAcctName] = useState('');
 
-  // UI State
   const [searchQuery, setSearchQuery] = useState('');
   const [declineReason, setDeclineReason] = useState('');
   const [showDeclineModal, setShowDeclineModal] = useState(false);
@@ -172,7 +161,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
 
   const getPassword = (userId: string) => localStorage.getItem(`rb_pwd_${userId}`) || '(not set)';
 
-  // ── ACTIONS ──
   const handleApproveDriver = async (driverId: string, driverName: string) => {
     await supabase.from('rb_drivers').update({ status: 'active' }).eq('id', driverId);
     await sendNotification(driverId, 'driver', '🎉 Application Approved!', 'Congratulations! Your RetroBliss driver account is now active. Log in to start accepting rides!');
@@ -285,8 +273,7 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
       const bal = Number(d.wallet_balance);
       const ceoShare = bal * ((100 - retentionPct) / 100);
       if (ceoShare > 0.5) {
-        const newBal = bal - ceoShare;
-        await supabase.from('rb_drivers').update({ wallet_balance: newBal }).eq('id', d.id);
+        await supabase.from('rb_drivers').update({ wallet_balance: bal - ceoShare }).eq('id', d.id);
         total += ceoShare;
         await supabase.from('rb_transactions').insert({
           id: generateId(), user_id: d.id, user_role: 'driver', type: 'debit',
@@ -391,8 +378,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
     fetchNotifications();
   };
 
-  // ─────────────────────────────────────────────────────────────
-  // BOTTOM TABS CONFIG (7 primary shown at once on bottom)
   const bottomTabs: { key: CEOTab; icon: string; label: string }[] = [
     { key: 'dashboard', icon: '📊', label: 'Dashboard' },
     { key: 'riders', icon: '🛵', label: 'Riders' },
@@ -412,7 +397,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
     { key: 'contact-settings', icon: '📞', label: 'Contacts' },
   ];
 
-  // ── DETAIL VIEW ──
   const renderDetail = () => {
     if (!selectedItem) return null;
     const d = selectedItem;
@@ -421,11 +405,9 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
       const isDriver = activeTab === 'drivers';
       const table = isDriver ? 'rb_drivers' as const : 'rb_riders' as const;
       const pwd = getPassword(d.id as string);
-
       return (
         <div style={{ padding: '20px 20px 120px', maxWidth: '480px', margin: '0 auto', overflowY: 'auto' }}>
           <button onClick={() => { setDetailView(false); setSelectedItem(null); }} style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: '14px', padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: '14px', fontFamily: "'Poppins', sans-serif", marginBottom: '20px' }}>← Back</button>
-
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px' }}>
             <ProfileAvatar name={d.full_name as string} profilePic={d.profile_pic as string | null} size={84} />
             <h3 style={{ color: 'white', fontSize: '22px', fontWeight: 800, margin: '12px 0 4px' }}>{d.full_name as string}</h3>
@@ -434,20 +416,18 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               <span style={{ color: d.status === 'active' ? '#4ADE80' : d.status === 'frozen' ? '#FCA5A5' : '#FCD34D', fontSize: '12px', fontWeight: 700, textTransform: 'capitalize' }}>{d.status as string}</span>
             </div>
           </div>
-
-          {/* Profile info */}
           <div className="glass-card" style={{ padding: '18px', marginBottom: '14px', borderRadius: '20px' }}>
             {[
               { label: '📧 Email', value: d.email as string },
               { label: '📱 Phone', value: d.phone as string },
-              { label: '📍 Location', value: `${d.location}, ${d.state}` as string },
+              { label: '📍 Location', value: `${d.location}, ${d.state}` },
               { label: '💰 Wallet', value: `₦${Number(d.wallet_balance).toLocaleString()}` },
               { label: '📅 Joined', value: new Date(d.created_at as string).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) },
               ...(isDriver ? [
-                { label: '🚗 Vehicle', value: `${d.vehicle_year} ${d.vehicle_make} ${d.vehicle_model}` as string },
+                { label: '🚗 Vehicle', value: `${d.vehicle_year} ${d.vehicle_make} ${d.vehicle_model}` },
                 { label: '🪪 Plate', value: d.vehicle_plate as string },
                 { label: '🎨 Color', value: d.vehicle_color as string },
-                { label: '🏦 Bank', value: `${d.bank_name} · ${d.bank_account}` as string },
+                { label: '🏦 Bank', value: `${d.bank_name} · ${d.bank_account}` },
                 { label: '👤 Acct Name', value: d.bank_account_name as string },
               ] : []),
             ].map(item => (
@@ -457,8 +437,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               </div>
             ))}
           </div>
-
-          {/* CEO-ONLY: Login credentials */}
           <div className="glass-card" style={{ padding: '16px', marginBottom: '14px', borderRadius: '20px', border: '1px solid rgba(245,158,11,0.2)' }}>
             <p style={{ color: '#FCD34D', fontSize: '11px', fontWeight: 700, margin: '0 0 10px', letterSpacing: '0.1em' }}>🔐 LOGIN CREDENTIALS (CEO ONLY)</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -470,8 +448,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               <span style={{ color: '#FCD34D', fontSize: '13px', fontWeight: 700 }}>{pwd}</span>
             </div>
           </div>
-
-          {/* ID Upload for drivers */}
           {isDriver && d.id_upload && (
             <div className="glass-card" style={{ padding: '16px', marginBottom: '14px', borderRadius: '20px' }}>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 600, margin: '0 0 10px', letterSpacing: '0.08em' }}>GOVERNMENT ID DOCUMENT</p>
@@ -484,8 +460,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               )}
             </div>
           )}
-
-          {/* Action buttons */}
           <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
             <button onClick={() => handleFreezeAccount(d.id as string, d.full_name as string, table, d.status !== 'frozen', isDriver ? 'driver' : 'rider')} style={{ flex: 1, padding: '14px', borderRadius: '16px', background: d.status !== 'frozen' ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)', border: `1px solid ${d.status !== 'frozen' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`, color: d.status !== 'frozen' ? '#FCA5A5' : '#4ADE80', cursor: 'pointer', fontSize: '13px', fontWeight: 600, fontFamily: "'Poppins', sans-serif" }}>
               {d.status !== 'frozen' ? '🔒 Freeze' : '🔓 Unfreeze'}
@@ -499,7 +473,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
     }
 
     if (activeTab === 'approvals') {
-      const d = selectedItem;
       return (
         <div style={{ padding: '20px 20px 120px', maxWidth: '480px', margin: '0 auto', overflowY: 'auto' }}>
           <button onClick={() => { setDetailView(false); setSelectedItem(null); }} style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: '14px', padding: '10px 16px', color: 'white', cursor: 'pointer', fontSize: '14px', fontFamily: "'Poppins', sans-serif", marginBottom: '20px' }}>← Back</button>
@@ -512,11 +485,11 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
             {[
               { label: 'Email', value: d.email as string },
               { label: 'Phone', value: d.phone as string },
-              { label: 'Location', value: `${d.location}, ${d.state}` as string },
-              { label: 'Vehicle', value: `${d.vehicle_year} ${d.vehicle_make} ${d.vehicle_model}` as string },
+              { label: 'Location', value: `${d.location}, ${d.state}` },
+              { label: 'Vehicle', value: `${d.vehicle_year} ${d.vehicle_make} ${d.vehicle_model}` },
               { label: 'Plate', value: d.vehicle_plate as string },
               { label: 'Color', value: d.vehicle_color as string },
-              { label: 'Bank', value: `${d.bank_name} · ${d.bank_account}` as string },
+              { label: 'Bank', value: `${d.bank_name} · ${d.bank_account}` },
               { label: 'Account Name', value: d.bank_account_name as string },
               { label: 'Applied', value: new Date(d.created_at as string).toLocaleString('en-NG') },
             ].map(item => (
@@ -526,8 +499,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               </div>
             ))}
           </div>
-
-          {/* Also show credentials */}
           <div className="glass-card" style={{ padding: '16px', marginBottom: '14px', borderRadius: '20px', border: '1px solid rgba(245,158,11,0.2)' }}>
             <p style={{ color: '#FCD34D', fontSize: '11px', fontWeight: 700, margin: '0 0 8px', letterSpacing: '0.1em' }}>🔐 LOGIN CREDENTIALS</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -539,7 +510,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               <span style={{ color: '#FCD34D', fontSize: '13px', fontWeight: 700 }}>{getPassword(d.id as string)}</span>
             </div>
           </div>
-
           {d.id_upload && (
             <div className="glass-card" style={{ padding: '16px', marginBottom: '14px', borderRadius: '20px' }}>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 600, margin: '0 0 10px', letterSpacing: '0.08em' }}>GOVERNMENT ID</p>
@@ -641,12 +611,10 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
     return null;
   };
 
-  // ── MAIN TAB CONTENT ──
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard': return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* CEO Wallet Card */}
           <div style={{ background: 'linear-gradient(135deg, #6D28D9, #EC4899)', borderRadius: '28px', padding: '28px', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(255,255,255,0.07)' }} />
             <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '11px', fontWeight: 700, margin: '0 0 6px', letterSpacing: '0.12em' }}>CEO ADMINISTRATIVE WALLET</p>
@@ -654,8 +622,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
             <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px', margin: '0 0 2px' }}>Total Earned: ₦{ceoWallet.total_earned.toLocaleString()}</p>
             <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '12px', margin: 0 }}>Platform Volume: ₦{ceoWallet.total_platform_volume.toLocaleString()}</p>
           </div>
-
-          {/* Stats Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             {[
               { label: 'Total Riders', value: stats.totalRiders, icon: '🛵', color: '#8B5CF6', tab: 'riders' as CEOTab },
@@ -672,8 +638,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               </button>
             ))}
           </div>
-
-          {/* Live map */}
           <div>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 700, margin: '0 0 10px', letterSpacing: '0.1em' }}>🔴 LIVE ACTIVE RIDES</p>
             <MapboxMap height={260} center={[3.3792, 6.5244]} zoom={9} markers={activeRideMarkers} mode="ceo" containerStyle={{ borderRadius: '22px' }} />
@@ -710,15 +674,15 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
           <div>
             <input className="rb-input" placeholder="🔍 Search drivers..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ marginBottom: '14px' }} />
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 12px' }}>{filtered.length} drivers</p>
-            {filtered.map(d => (
-              <button key={d.id as string} onClick={() => { setSelectedItem(d); setDetailView(true); }} style={{ width: '100%', textAlign: 'left', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '18px', padding: '14px 16px', marginBottom: '9px', cursor: 'pointer', fontFamily: "'Poppins', sans-serif", display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <ProfileAvatar name={d.full_name as string} profilePic={d.profile_pic as string | null} size={44} />
+            {filtered.map(dr => (
+              <button key={dr.id as string} onClick={() => { setSelectedItem(dr); setDetailView(true); }} style={{ width: '100%', textAlign: 'left', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '18px', padding: '14px 16px', marginBottom: '9px', cursor: 'pointer', fontFamily: "'Poppins', sans-serif", display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <ProfileAvatar name={dr.full_name as string} profilePic={dr.profile_pic as string | null} size={44} />
                 <div style={{ flex: 1 }}>
-                  <p style={{ color: 'white', fontSize: '14px', fontWeight: 700, margin: '0 0 2px' }}>{d.full_name as string}</p>
-                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: 0 }}>{d.vehicle_make as string} {d.vehicle_model as string} · ₦{Number(d.wallet_balance).toLocaleString()}</p>
+                  <p style={{ color: 'white', fontSize: '14px', fontWeight: 700, margin: '0 0 2px' }}>{dr.full_name as string}</p>
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: 0 }}>{dr.vehicle_make as string} {dr.vehicle_model as string} · ₦{Number(dr.wallet_balance).toLocaleString()}</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: (d.is_online as boolean) ? '#4ADE80' : 'rgba(255,255,255,0.15)' }} />
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: (dr.is_online as boolean) ? '#4ADE80' : 'rgba(255,255,255,0.15)' }} />
                   <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '16px' }}>›</span>
                 </div>
               </button>
@@ -736,12 +700,12 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '15px', fontWeight: 600 }}>All caught up!</p>
               <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '13px' }}>No pending driver applications</p>
             </div>
-          ) : pendingDrivers.map(d => (
-            <button key={d.id as string} onClick={() => { setSelectedItem(d); setDetailView(true); }} style={{ width: '100%', textAlign: 'left', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '18px', padding: '14px 16px', marginBottom: '9px', cursor: 'pointer', fontFamily: "'Poppins', sans-serif", display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <ProfileAvatar name={d.full_name as string} profilePic={d.profile_pic as string | null} size={44} />
+          ) : pendingDrivers.map(pd => (
+            <button key={pd.id as string} onClick={() => { setSelectedItem(pd); setDetailView(true); }} style={{ width: '100%', textAlign: 'left', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '18px', padding: '14px 16px', marginBottom: '9px', cursor: 'pointer', fontFamily: "'Poppins', sans-serif", display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <ProfileAvatar name={pd.full_name as string} profilePic={pd.profile_pic as string | null} size={44} />
               <div style={{ flex: 1 }}>
-                <p style={{ color: 'white', fontSize: '14px', fontWeight: 700, margin: '0 0 2px' }}>{d.full_name as string}</p>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: 0 }}>{d.vehicle_year as string} {d.vehicle_make as string} · {d.state as string}</p>
+                <p style={{ color: 'white', fontSize: '14px', fontWeight: 700, margin: '0 0 2px' }}>{pd.full_name as string}</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: 0 }}>{pd.vehicle_year as string} {pd.vehicle_make as string} · {pd.state as string}</p>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                 <span style={{ background: 'rgba(245,158,11,0.15)', borderRadius: '10px', padding: '2px 10px', color: '#FCD34D', fontSize: '11px', fontWeight: 700 }}>PENDING</span>
@@ -763,7 +727,7 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
           <div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', overflowX: 'auto', paddingBottom: '4px' }}>
               {['all', 'active', 'searching', 'completed', 'cancelled'].map(s => (
-                <button key={s} onClick={() => setRideStatusFilter(s)} style={{ flexShrink: 0, padding: '7px 14px', borderRadius: '12px', background: rideStatusFilter === s ? (statusColors[s] || 'linear-gradient(135deg, #8B5CF6, #EC4899)') : 'rgba(255,255,255,0.06)', border: rideStatusFilter === s ? 'none' : '1px solid rgba(255,255,255,0.08)', color: rideStatusFilter === s ? (s === 'all' ? 'white' : 'white') : 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '11px', fontWeight: 700, fontFamily: "'Poppins', sans-serif", textTransform: 'capitalize' }}>{s}</button>
+                <button key={s} onClick={() => setRideStatusFilter(s)} style={{ flexShrink: 0, padding: '7px 14px', borderRadius: '12px', background: rideStatusFilter === s ? (statusColors[s] || 'rgba(139,92,246,0.4)') : 'rgba(255,255,255,0.06)', border: rideStatusFilter === s ? 'none' : '1px solid rgba(255,255,255,0.08)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 700, fontFamily: "'Poppins', sans-serif", textTransform: 'capitalize' }}>{s}</button>
               ))}
             </div>
             <input className="rb-input" placeholder="🔍 Search rides..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ marginBottom: '12px' }} />
@@ -791,15 +755,11 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', margin: '0 0 2px' }}>Earned All Time: ₦{ceoWallet.total_earned.toLocaleString()}</p>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', margin: 0 }}>Withdrawn: ₦{ceoWallet.total_withdrawn.toLocaleString()}</p>
           </div>
-
-          {/* Platform volume */}
           <div className="glass-card" style={{ padding: '18px', borderRadius: '20px' }}>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 700, margin: '0 0 6px', letterSpacing: '0.1em' }}>TOTAL PLATFORM VOLUME</p>
             <p style={{ color: '#4ADE80', fontSize: '28px', fontWeight: 800, margin: 0 }}>₦{ceoWallet.total_platform_volume.toLocaleString()}</p>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', margin: '4px 0 0' }}>All money ever processed through RetroBliss</p>
           </div>
-
-          {/* Commission settings */}
           <div className="glass-card" style={{ padding: '20px', borderRadius: '20px' }}>
             <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 16px' }}>⚙️ Commission Split</h3>
             <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '8px' }}>DRIVER KEEPS: {retentionPct}% · CEO GETS: {100 - retentionPct}%</label>
@@ -811,14 +771,12 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               </div>
               <div style={{ background: 'rgba(139,92,246,0.1)', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
                 <p style={{ color: '#C4B5FD', fontSize: '22px', fontWeight: 800, margin: '0 0 2px' }}>{100 - retentionPct}%</p>
-                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: 0' }}>RetroBliss gets</p>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: 0 }}>RetroBliss gets</p>
               </div>
             </div>
             <button onClick={handleSaveSettings} className="btn-gradient" style={{ width: '100%', padding: '14px', borderRadius: '16px', fontSize: '14px', fontWeight: 700, marginBottom: '10px' }}>Save Commission Settings</button>
             <button onClick={handleCollectEarnings} style={{ width: '100%', padding: '14px', borderRadius: '16px', background: 'linear-gradient(135deg, #F59E0B, #EF4444)', border: 'none', color: 'white', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Poppins', sans-serif" }}>💼 Collect Commissions Now</button>
           </div>
-
-          {/* CEO withdrawal */}
           <div className="glass-card" style={{ padding: '20px', borderRadius: '20px' }}>
             <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 16px' }}>💸 CEO Wallet Withdrawal</h3>
             <input className="rb-input" type="number" placeholder="Amount (min ₦1,000)" value={ceoWithdrawAmount} onChange={e => setCeoWithdrawAmount(e.target.value)} style={{ marginBottom: '10px' }} />
@@ -926,11 +884,9 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               </button>
             </div>
           </div>
-
-          {/* Nigerian States Selector */}
           <div className="glass-card" style={{ padding: '20px', borderRadius: '20px' }}>
             <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 4px' }}>🗺️ Active Ride States</h3>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 14px' }}>Only riders in these Nigerian states can book rides. All cities & locations from active states are auto-available for autocomplete.</p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 14px' }}>Only riders in these Nigerian states can book rides.</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px', maxHeight: '220px', overflowY: 'auto' }}>
               {ALL_NIGERIAN_STATES.map(state => (
                 <button key={state} onClick={() => setAvailableNigerianStates(prev => prev.includes(state) ? prev.filter(s => s !== state) : [...prev, state])} style={{ padding: '6px 12px', borderRadius: '12px', background: availableNigerianStates.includes(state) ? 'linear-gradient(135deg, #8B5CF6, #EC4899)' : 'rgba(255,255,255,0.05)', border: availableNigerianStates.includes(state) ? 'none' : '1px solid rgba(255,255,255,0.08)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: availableNigerianStates.includes(state) ? 700 : 400, fontFamily: "'Poppins', sans-serif" }}>
@@ -946,11 +902,9 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
               <button onClick={() => setAvailableNigerianStates([])} style={{ flex: 1, padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', fontFamily: "'Poppins', sans-serif" }}>Clear All</button>
             </div>
           </div>
-
-          {/* Specific locations */}
           <div className="glass-card" style={{ padding: '20px', borderRadius: '20px' }}>
             <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 4px' }}>📍 Specific Available Locations</h3>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 14px' }}>Add specific areas (these supplement state-level availability)</p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 14px' }}>Add specific areas (supplement state-level availability)</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginBottom: '12px', maxHeight: '160px', overflowY: 'auto' }}>
               {availableLocations.map(loc => (
                 <div key={loc} style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '12px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '7px' }}>
@@ -961,10 +915,9 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input className="rb-input" placeholder="Add location (e.g. Lekki Phase 1)..." value={newLocationsInput} onChange={e => setNewLocationsInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newLocationsInput.trim()) { setAvailableLocations(prev => [...prev, newLocationsInput.trim()]); setNewLocationsInput(''); } }} style={{ flex: 1, fontSize: '13px' }} />
-              <button onClick={() => { if (newLocationsInput.trim()) { setAvailableLocations(prev => [...prev, newLocationsInput.trim()]); setNewLocationsInput(''); } }} style={{ padding: '0 16px', borderRadius: '16px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', cursor: 'pointer', fontSize: '16px', fontWeight: 700, fontFamily: "'Poppins', sans-serif", flexShrink: 0 }}>+</button>
+              <button onClick={() => { if (newLocationsInput.trim()) { setAvailableLocations(prev => [...prev, newLocationsInput.trim()]); setNewLocationsInput(''); } }} style={{ padding: '0 16px', borderRadius: '16px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', cursor: 'pointer', fontSize: '16px', fontFamily: "'Poppins', sans-serif", flexShrink: 0 }}>+</button>
             </div>
           </div>
-
           <button onClick={handleSaveSettings} className="btn-gradient" style={{ width: '100%', padding: '16px', borderRadius: '20px', fontSize: '15px', fontWeight: 700 }}>💾 Save All Platform Settings</button>
         </div>
       );
@@ -974,7 +927,7 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 14px' }}>{notifications.length} notifications · {notifCount} unread</p>
           {notifications.map(n => (
             <div key={n.id as string} className="glass-card" style={{ padding: '15px', marginBottom: '10px', borderRadius: '20px', border: n.read ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(139,92,246,0.3)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }} onClick={() => handleMarkNotifRead(n.id as string)}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', cursor: 'pointer' }} onClick={() => handleMarkNotifRead(n.id as string)}>
                 <div style={{ flex: 1 }}>
                   <p style={{ color: 'white', fontSize: '13px', fontWeight: n.read ? 500 : 700, margin: '0 0 3px' }}>{n.title as string}</p>
                   <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 3px', lineHeight: 1.4 }}>{n.message as string}</p>
@@ -1048,7 +1001,7 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
         const uniqueUsers = Object.entries(userChats).map(([uid, msgs]) => {
           const lastMsg = [...msgs].sort((a, b) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime())[0] as Record<string, unknown>;
           const userMsg = msgs.find((m: Record<string, unknown>) => m.sender !== 'ceo') as Record<string, unknown> | undefined;
-          return { id: uid, name: (userMsg?.user_name as string) || 'User', role: lastMsg?.user_role as string, lastMsg: lastMsg?.message as string, time: lastMsg?.created_at as string, unread: msgs.filter((m: Record<string, unknown>) => !(m.read as boolean) && m.sender !== 'ceo').length };
+          return { id: uid, name: (userMsg?.user_name as string) || 'User', role: lastMsg?.user_role as string, lastMsg: lastMsg?.message as string, unread: msgs.filter((m: Record<string, unknown>) => !(m.read as boolean) && m.sender !== 'ceo').length };
         });
 
         return (
@@ -1106,7 +1059,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
     }
   };
 
-  // ── RENDER ──
   if (detailView && selectedItem) {
     return (
       <div style={{ minHeight: '100vh', background: '#080612', fontFamily: "'Poppins', sans-serif", overflowY: 'auto' }}>
@@ -1132,8 +1084,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
   return (
     <div style={{ minHeight: '100vh', background: '#080612', fontFamily: "'Poppins', sans-serif", paddingBottom: '80px' }}>
       <NotificationSystem userId="ceo" userRole="admin" />
-
-      {/* Header */}
       <div style={{ background: 'rgba(8,6,18,0.98)', backdropFilter: 'blur(24px)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '48px 20px 16px', position: 'sticky', top: 0, zIndex: 50, maxWidth: '480px', margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
           <div>
@@ -1145,8 +1095,6 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
           </div>
           <button onClick={onLogout} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '8px 14px', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', fontFamily: "'Poppins', sans-serif" }}>Sign Out</button>
         </div>
-
-        {/* More tabs as scrollable chips */}
         <div style={{ display: 'flex', gap: '7px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
           {moreTabs.map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)} style={{ flexShrink: 0, padding: '7px 12px', borderRadius: '12px', background: activeTab === t.key ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.05)', border: activeTab === t.key ? '1.5px solid rgba(139,92,246,0.5)' : '1px solid rgba(255,255,255,0.07)', color: activeTab === t.key ? '#C4B5FD' : 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '11px', fontWeight: activeTab === t.key ? 700 : 500, fontFamily: "'Poppins', sans-serif", whiteSpace: 'nowrap' }}>
@@ -1155,21 +1103,17 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
           ))}
         </div>
       </div>
-
-      {/* Content */}
       <div style={{ padding: '20px 20px 20px', maxWidth: '480px', margin: '0 auto' }}>
         <h3 style={{ color: 'white', fontSize: '18px', fontWeight: 800, margin: '0 0 16px' }}>
           {[...bottomTabs, ...moreTabs].find(t => t.key === activeTab)?.icon} {activeTab.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
         </h3>
         {renderTabContent()}
       </div>
-
-      {/* Bottom 7-Tab Navigation */}
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '480px', background: 'rgba(8,6,18,0.97)', backdropFilter: 'blur(24px)', borderTop: '1px solid rgba(255,255,255,0.07)', padding: '8px 8px', paddingBottom: 'max(8px, env(safe-area-inset-bottom))', zIndex: 50 }}>
         <div style={{ display: 'flex', gap: '4px' }}>
           {bottomTabs.map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)} style={{ flex: 1, padding: '10px 2px 8px', borderRadius: '14px', background: activeTab === t.key ? 'rgba(139,92,246,0.2)' : 'transparent', border: activeTab === t.key ? '1.5px solid rgba(139,92,246,0.4)' : '1px solid transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', transition: 'all 0.2s ease', fontFamily: "'Poppins', sans-serif" }}>
-              <span style={{ fontSize: t.key === 'approvals' && pendingDrivers.length > 0 ? '16px' : '20px' }}>
+              <span style={{ fontSize: '20px' }}>
                 {t.key === 'approvals' && pendingDrivers.length > 0 ? (
                   <span style={{ position: 'relative', display: 'inline-block' }}>
                     {t.icon}
@@ -1177,15 +1121,11 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
                   </span>
                 ) : t.icon}
               </span>
-              <span style={{ color: activeTab === t.key ? '#C4B5FD' : 'rgba(255,255,255,0.35)', fontSize: '9px', fontWeight: activeTab === t.key ? 700 : 500, textAlign: 'center', lineHeight: 1.2 }}>
-                {t.label.replace(` (${pendingDrivers.length})`, '')}
-              </span>
+              <span style={{ color: activeTab === t.key ? '#C4B5FD' : 'rgba(255,255,255,0.35)', fontSize: '9px', fontWeight: activeTab === t.key ? 700 : 500, textAlign: 'center', lineHeight: 1.2 }}>{t.label}</span>
             </button>
           ))}
         </div>
       </div>
-
-      {/* Decline Modal */}
       {showDeclineModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div className="glass-strong" style={{ borderRadius: '24px', padding: '24px', width: '100%', maxWidth: '380px', animation: 'scaleIn 0.3s ease' }}>
