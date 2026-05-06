@@ -23,6 +23,11 @@ const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, on
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const [forgotMode, setForgotMode] = useState<'off' | 'find' | 'reset'>('off');
+  const [forgotId, setForgotId] = useState('');
+  const [foundUserId, setFoundUserId] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPwd, setConfirmNewPwd] = useState('');
 
   const handleSignIn = async () => {
     setError('');
@@ -88,7 +93,68 @@ const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, on
     }
   };
 
+  const handleForgotFind = async () => {
+    if (!forgotId.trim()) { setError('Enter your email or username.'); return; }
+    setLoading(true); setError('');
+    const q = forgotId.trim().toLowerCase();
+    const { data: riderData } = await supabase.from('rb_riders').select('id,email,username').or(`username.eq.${q},email.eq.${q}`).limit(1);
+    if (riderData && riderData.length > 0) {
+      setFoundUserId(riderData[0].id);
+      setForgotMode('reset');
+      setLoading(false);
+      return;
+    }
+    setError('No account found with that email or username.');
+    setLoading(false);
+  };
+
+  const handleResetPassword = () => {
+    if (!newPassword || newPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (newPassword !== confirmNewPwd) { setError('Passwords do not match.'); return; }
+    localStorage.setItem(`rb_pwd_${foundUserId}`, newPassword);
+    setForgotMode('off'); setForgotId(''); setNewPassword(''); setConfirmNewPwd(''); setFoundUserId('');
+    toast.success('Password reset! You can now sign in with your new password.');
+  };
+
   if (transitioning) return <CarTransitionAnimation onComplete={handleTransitionComplete} loadingText="Welcome back! Fetching your ride..." />;
+
+  // ── FORGOT PASSWORD FLOW ──
+  if (forgotMode === 'find') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 50% 0%, #1e0a3c 0%, #0d0618 45%, #080612 100%)', display: 'flex', flexDirection: 'column', fontFamily: "'Poppins', sans-serif" }}>
+        <div style={{ padding: '52px 28px 40px', maxWidth: '440px', margin: '0 auto', width: '100%' }}>
+          <button onClick={() => { setForgotMode('off'); setError(''); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', fontSize: '14px', marginBottom: '28px', fontFamily: "'Poppins', sans-serif", padding: 0 }}>← Back</button>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '28px' }}><RetroBlissLogo size={60} /></div>
+          <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 800, margin: '0 0 6px' }}>Reset Password 🔐</h2>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: '0 0 28px' }}>Enter your email or username to find your account</p>
+          {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '16px', padding: '14px 18px', marginBottom: '20px' }}><p style={{ color: '#FCA5A5', fontSize: '13px', margin: 0 }}>{error}</p></div>}
+          <input className="rb-input" placeholder="Email or username" value={forgotId} onChange={e => setForgotId(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleForgotFind()} style={{ marginBottom: '16px' }} />
+          <button onClick={handleForgotFind} disabled={loading} className="btn-gradient" style={{ width: '100%', padding: '17px', borderRadius: '20px', fontSize: '16px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', opacity: loading ? 0.7 : 1 }}>
+            {loading ? <><div style={{ width: '20px', height: '20px', border: '2.5px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin-smooth 0.8s linear infinite' }} />Searching...</> : '🔍 Find My Account'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (forgotMode === 'reset') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 50% 0%, #1e0a3c 0%, #0d0618 45%, #080612 100%)', display: 'flex', flexDirection: 'column', fontFamily: "'Poppins', sans-serif" }}>
+        <div style={{ padding: '52px 28px 40px', maxWidth: '440px', margin: '0 auto', width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}><RetroBlissLogo size={60} /></div>
+          <div style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '16px', padding: '14px 18px', marginBottom: '24px', display: 'flex', gap: '10px' }}>
+            <span style={{ fontSize: '18px' }}>✅</span>
+            <p style={{ color: '#4ADE80', fontSize: '13px', margin: 0 }}>Account found! Set your new password below.</p>
+          </div>
+          {error && <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '16px', padding: '14px 18px', marginBottom: '16px' }}><p style={{ color: '#FCA5A5', fontSize: '13px', margin: 0 }}>{error}</p></div>}
+          <h2 style={{ color: 'white', fontSize: '22px', fontWeight: 800, margin: '0 0 20px' }}>Set New Password</h2>
+          <input className="rb-input" type="password" placeholder="New password (min 6 chars)" value={newPassword} onChange={e => setNewPassword(e.target.value)} style={{ marginBottom: '12px' }} />
+          <input className="rb-input" type="password" placeholder="Confirm new password" value={confirmNewPwd} onChange={e => setConfirmNewPwd(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleResetPassword()} style={{ marginBottom: '16px' }} />
+          <button onClick={handleResetPassword} className="btn-gradient" style={{ width: '100%', padding: '17px', borderRadius: '20px', fontSize: '16px', fontWeight: 700 }}>🔐 Reset Password</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -177,12 +243,13 @@ const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, on
               ) : '🚀 Sign In'}
             </button>
 
-            <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: '8px 0 0' }}>
-              Don't have an account?{' '}
-              <button onClick={onSignUp} style={{ background: 'none', border: 'none', color: '#A78BFA', fontWeight: 700, cursor: 'pointer', fontFamily: "'Poppins', sans-serif", fontSize: '14px' }}>
-                Sign up now
-              </button>
-            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+              <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '14px', margin: 0 }}>
+                Don't have an account?{' '}
+                <button onClick={onSignUp} style={{ background: 'none', border: 'none', color: '#A78BFA', fontWeight: 700, cursor: 'pointer', fontFamily: "'Poppins', sans-serif", fontSize: '14px' }}>Sign up now</button>
+              </p>
+              <button onClick={() => { setForgotMode('find'); setError(''); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '13px', fontFamily: "'Poppins', sans-serif", padding: 0 }}>Forgot password?</button>
+            </div>
           </div>
         </div>
       </div>

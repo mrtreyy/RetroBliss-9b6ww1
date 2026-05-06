@@ -461,8 +461,13 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
     setSubView('matching');
     setSearching(false);
 
-    // Start 10-second timer
+    // Start 10-second timer — after it fires, redirect rider back to home
     startDriverSearchTimer(mappedRide);
+    // After 10s, redirect rider back to home dashboard
+    setTimeout(() => {
+      setSubView('home');
+      setSearching(false);
+    }, 11000);
   };
 
   const handleCancelRide = async () => {
