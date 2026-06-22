@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import MapboxMap from '@/components/MapboxMap';
+import GoogleMapComponent from '@/components/GoogleMap';
+import FlutterwavePayment from '@/components/FlutterwavePayment';
 import NotificationSystem from '@/components/NotificationSystem';
 import ProfileAvatar from '@/components/ProfileAvatar';
 import ChatSupport from '@/pages/ChatSupport';
 import ContactOfficials from '@/pages/ContactOfficials';
 import AboutPage from '@/pages/AboutPage';
 import { supabase, generateId, logAuditDB, getClientIP, sendNotification, getPlatformSetting } from '@/lib/supabase';
-import { searchLocations, getLocationCoords, getLocationsForStates, ALL_NIGERIAN_STATES } from '@/lib/nigerianLocations';
+import { searchLocations, getLocationCoords, getLocationsForStates } from '@/lib/nigerianLocations';
 import type { Rider, Ride, Transaction } from '@/types';
 import { toast } from 'sonner';
 import { showLocalNotification, startReEngagementNotifications } from '@/lib/pushNotifications';
@@ -19,7 +20,7 @@ interface RiderHomeProps {
 }
 
 type Tab = 'ride' | 'schedule' | 'share';
-type SubView = 'home' | 'wallet' | 'history' | 'profile' | 'matching' | 'active-ride' | 'rating' | 'chat' | 'contact' | 'about' | 'profile-edit';
+type SubView = 'home' | 'wallet' | 'topup' | 'history' | 'profile' | 'matching' | 'active-ride' | 'rating' | 'chat' | 'contact' | 'about' | 'profile-edit';
 
 interface DriverMarker {
   id: string;
@@ -41,8 +42,6 @@ const NIGERIAN_COORDS: Record<string, [number, number]> = {
   'Benin City': [5.6037, 6.3350], 'Abeokuta': [3.3450, 7.1551],
 };
 
-const MAPBOX_TOKEN = 'pk.eyJ1IjoicGVhY2U1NDMiLCJhIjoiY21vaHMwYzI2MDc3NjJycXZhdzFsb2ZyeiJ9.9nX4dOizNfUbny-D06iOBQ';
-
 const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider }) => {
   const [tab, setTab] = useState<Tab>('ride');
   const [subView, setSubView] = useState<SubView>('home');
@@ -55,7 +54,6 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
   const [completedRideForRating, setCompletedRideForRating] = useState<Ride | null>(null);
   const [matchedDriver, setMatchedDriver] = useState<{ id: string; name: string; rating: number; vehicle: string; plate: string; eta: string; profilePic?: string } | null>(null);
   const [onlineDrivers, setOnlineDrivers] = useState<DriverMarker[]>([]);
-  const [topUpAmount, setTopUpAmount] = useState('');
   const [activeStates, setActiveStates] = useState<string[]>([]);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
@@ -70,8 +68,7 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
   const [ratingComment, setRatingComment] = useState('');
   const [driverLocation, setDriverLocation] = useState<[number, number] | undefined>(undefined);
   const [sideMenuOpen, setSideMenuOpen] = useState(false);
-  const [mapSearchQuery, setMapSearchQuery] = useState('');
-  const [mapCenter, setMapCenter] = useState<[number, number]>([3.3792, 6.5244]);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 6.5244, lng: 3.3792 });
   const [mapZoom, setMapZoom] = useState(11);
   const [pendingRides, setPendingRides] = useState<Ride[]>([]);
   const [showPendingList, setShowPendingList] = useState(false);
@@ -316,23 +313,11 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
     return activeStates.join(', ');
   };
 
-  // Map search using Mapbox Geocoding
-  const handleMapSearch = async () => {
-    if (!mapSearchQuery.trim()) return;
-    try {
-      const q = encodeURIComponent(mapSearchQuery + ', Nigeria');
-      const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${q}.json?access_token=${MAPBOX_TOKEN}&country=NG&limit=1`);
-      const data = await res.json();
-      if (data.features && data.features.length > 0) {
-        const [lng, lat] = data.features[0].center;
-        setMapCenter([lng, lat]);
-        setMapZoom(14);
-        toast.success(`Found: ${data.features[0].place_name}`);
-      } else {
-        toast.error('Place not found. Try a different search term.');
-      }
-    } catch {
-      toast.error('Search failed. Check your connection.');
+  const handleMapLocationSelect = (lat: number, lng: number, placeName: string) => {
+    setMapCenter({ lat, lng });
+    setMapZoom(15);
+    if (placeName && !placeName.includes(',')) {
+      toast.success(`Pinned: ${placeName}`);
     }
   };
 
@@ -493,21 +478,12 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
     toast.error('🚨 SOS Alert Sent! Help is on the way.', { duration: 8000 });
   };
 
-  const handleTopUp = async () => {
-    const amount = parseFloat(topUpAmount);
-    if (isNaN(amount) || amount < 100) { toast.error('Minimum top-up is ₦100.'); return; }
-    if (!rider) return;
-    const newBalance = walletBalance + amount;
-    await supabase.from('rb_riders').update({ wallet_balance: newBalance }).eq('id', rider.id);
-    await supabase.from('rb_transactions').insert({
-      id: generateId(), user_id: rider.id, user_role: 'rider',
-      type: 'credit', amount, description: 'Wallet top-up via bank transfer',
-      reference: `TOP${Date.now()}`, created_at: new Date().toISOString(),
-    });
+  const handlePaymentSuccess = (newBalance: number, credited: number) => {
     setWalletBalance(newBalance);
-    setTopUpAmount('');
-    toast.success(`₦${amount.toLocaleString()} added to wallet!`);
+    onUpdateRider({ ...rider!, walletBalance: newBalance });
+    toast.success(`₦${credited.toLocaleString('en-NG', { minimumFractionDigits: 2 })} credited to your wallet!`);
     fetchTransactions();
+    setSubView('wallet');
   };
 
   const handleSubmitRating = async () => {
@@ -530,6 +506,17 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
   };
 
   if (!rider) return null;
+
+  // ── FLUTTERWAVE TOP-UP ──
+  if (subView === 'topup') {
+    return (
+      <FlutterwavePayment
+        rider={{ ...rider, walletBalance }}
+        onSuccess={handlePaymentSuccess}
+        onBack={() => setSubView('wallet')}
+      />
+    );
+  }
 
   // ── CHAT SUPPORT ──
   if (subView === 'chat') {
@@ -675,28 +662,32 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
           <div style={{ background: 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)', borderRadius: '28px', padding: '28px', marginBottom: '24px', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
             <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, margin: '0 0 8px', letterSpacing: '0.06em' }}>WALLET BALANCE</p>
-            <p style={{ color: 'white', fontSize: '38px', fontWeight: 800, margin: '0 0 4px' }}>₦{walletBalance.toLocaleString()}</p>
+            <p style={{ color: 'white', fontSize: '38px', fontWeight: 800, margin: '0 0 4px' }}>₦{walletBalance.toLocaleString('en-NG')}</p>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', margin: 0 }}>Non-withdrawable · Used for rides only</p>
           </div>
-          <div className="glass-card" style={{ padding: '20px', marginBottom: '20px', borderRadius: '24px' }}>
-            <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 14px' }}>💰 Top Up Wallet</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
-              {[500, 1000, 2000, 5000, 10000, 20000].map(amt => (
-                <button key={amt} onClick={() => setTopUpAmount(String(amt))} style={{ padding: '11px 6px', borderRadius: '14px', background: topUpAmount === String(amt) ? 'linear-gradient(135deg, #8B5CF6, #EC4899)' : 'rgba(255,255,255,0.06)', border: `1px solid ${topUpAmount === String(amt) ? 'transparent' : 'rgba(255,255,255,0.08)'}`, color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600, fontFamily: "'Poppins', sans-serif" }}>₦{amt.toLocaleString()}</button>
-              ))}
+
+          {/* Top Up CTA */}
+          <button
+            onClick={() => setSubView('topup')}
+            style={{ width: '100%', padding: '18px', borderRadius: '20px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', fontSize: '16px', fontWeight: 700, cursor: 'pointer', fontFamily: "'Poppins', sans-serif", marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: '0 8px 28px rgba(139,92,246,0.45)' }}
+          >
+            💳 Top Up Wallet
+          </button>
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px', textAlign: 'center', marginTop: '-18px', marginBottom: '24px' }}>Powered by Flutterwave · Card &amp; Bank Transfer</p>
+
+          <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 12px' }}>Recent Transactions</h3>
+          {transactions.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <p style={{ fontSize: '40px', margin: '0 0 10px' }}>💳</p>
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '13px' }}>No transactions yet</p>
             </div>
-            <input className="rb-input" type="number" placeholder="Or enter custom amount..." value={topUpAmount} onChange={e => setTopUpAmount(e.target.value)} style={{ marginBottom: '12px' }} />
-            <button onClick={handleTopUp} className="btn-gradient" style={{ width: '100%', padding: '15px', borderRadius: '16px', fontSize: '15px', fontWeight: 700 }}>💳 Top Up via Bank Transfer</button>
-            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', textAlign: 'center', marginTop: '8px' }}>Powered by Paystack · Instant credit</p>
-          </div>
-          <h3 style={{ color: 'white', fontSize: '15px', fontWeight: 700, margin: '0 0 12px' }}>Recent</h3>
-          {transactions.slice(0, 5).map(tx => (
+          ) : transactions.slice(0, 5).map(tx => (
             <div key={tx.id} className="glass" style={{ borderRadius: '16px', padding: '14px 16px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <p style={{ color: 'white', fontSize: '13px', fontWeight: 500, margin: 0 }}>{tx.description}</p>
                 <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', margin: '2px 0 0' }}>{new Date(tx.created_at).toLocaleDateString()}</p>
               </div>
-              <p style={{ color: tx.type === 'credit' ? '#4ADE80' : '#FCA5A5', fontSize: '15px', fontWeight: 700, margin: 0 }}>{tx.type === 'credit' ? '+' : '-'}₦{tx.amount.toLocaleString()}</p>
+              <p style={{ color: tx.type === 'credit' ? '#4ADE80' : '#FCA5A5', fontSize: '15px', fontWeight: 700, margin: 0 }}>{tx.type === 'credit' ? '+' : '-'}₦{tx.amount.toLocaleString('en-NG')}</p>
             </div>
           ))}
           <button onClick={() => setSubView('history')} style={{ width: '100%', marginTop: '8px', padding: '12px', borderRadius: '14px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '13px', fontFamily: "'Poppins', sans-serif" }}>View All Transactions →</button>
@@ -767,7 +758,14 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
       <div style={{ minHeight: '100vh', background: '#080612', display: 'flex', flexDirection: 'column', fontFamily: "'Poppins', sans-serif" }}>
         <NotificationSystem userId={rider.id} userRole="rider" />
         <div style={{ position: 'relative', flex: 1 }}>
-          <MapboxMap height="100%" center={pickupC} zoom={13} activeRideRoute={{ pickup: pickupC, destination: destC, driver: driverLocation }} mode="rider" containerStyle={{ height: 'calc(100vh - 230px)', borderRadius: '0' }} />
+          <GoogleMapComponent
+            height="calc(100vh - 230px)"
+            center={{ lat: pickupC[1], lng: pickupC[0] }}
+            zoom={13}
+            activeRideRoute={{ pickup: pickupC, destination: destC, driver: driverLocation }}
+            mode="rider"
+            containerStyle={{ height: 'calc(100vh - 230px)', borderRadius: '0' }}
+          />
           <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', zIndex: 10 }}>
             <div className="glass-strong" style={{ borderRadius: '20px', padding: '14px 18px' }}>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', margin: '0 0 4px', fontWeight: 600, letterSpacing: '0.08em' }}>ACTIVE RIDE</p>
@@ -969,33 +967,17 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
         )}
       </div>
 
-      {/* MAP with search */}
-      <div style={{ padding: '0 20px', maxWidth: '480px', margin: '0 auto', width: '100%', minHeight: '240px' }}>
-        {/* Map search bar */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-          <input
-            className="rb-input"
-            placeholder="🔍 Search any place in Nigeria..."
-            value={mapSearchQuery}
-            onChange={e => setMapSearchQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleMapSearch()}
-            style={{ flex: 1, fontSize: '13px', padding: '11px 16px' }}
-          />
-          <button onClick={handleMapSearch} style={{ padding: '11px 16px', borderRadius: '18px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', fontFamily: "'Poppins', sans-serif", fontWeight: 600, flexShrink: 0 }}>Go</button>
-        </div>
-        <MapboxMap
-          height={240}
+      {/* GOOGLE MAP */}
+      <div style={{ padding: '0 20px', maxWidth: '480px', margin: '0 auto', width: '100%' }}>
+        <GoogleMapComponent
+          height={320}
           center={mapCenter}
           zoom={mapZoom}
-          markers={onlineDrivers}
+          markers={onlineDrivers.map(d => ({ id: d.id, lat: d.lat, lng: d.lng, label: d.label, color: d.color }))}
+          onLocationSelect={handleMapLocationSelect}
           mode="rider"
-          containerStyle={{ borderRadius: '20px', width: '100%' }}
+          containerStyle={{ borderRadius: '22px', width: '100%' }}
         />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-44px', marginRight: '12px', position: 'relative', zIndex: 5 }}>
-          <button style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0a18" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>
-          </button>
-        </div>
       </div>
 
       {/* Request Ride button */}
