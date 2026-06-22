@@ -1,0 +1,54 @@
+1. GOOGLE MAPS — Real-time place autocomplete
+Use @react-google-maps/api. Replace any existing search box with Google Places Autocomplete so that as the user types each letter, a dropdown instantly appears showing matching place suggestions from anywhere on earth — exactly like typing in Google Maps itself. Use the Autocomplete component (not StandaloneSearchBox). When the user selects a suggestion from the dropdown, pan the map to that location and drop a marker on it. The suggestions must appear on every keystroke. API key is import.meta.env.VITE_GOOGLE_MAPS_API_KEY. Load the places library in LoadScript (libraries={["places"]}). Centre the map on Lagos, Nigeria (6.5244, 3.3792) by default.
+
+2. FLUTTERWAVE v3 PAYMENT SYSTEM
+Update the existing payment system to work with Flutterwave v3. Credentials already stored as secrets: FLW_SECRET_KEY (FLWSECK-... format) and VITE_FLW_PUBLIC_KEY (FLWPUBK-... format).
+
+Deposit amounts: Minimum ₦500. Preset options only — no free text entry: ₦500, ₦1,000, ₦2,000, ₦3,000, ₦4,000, ₦5,000, ₦6,000, ₦7,000, ₦8,000, ₦9,000, ₦10,000.
+
+Fee calculation — implement exactly this logic, step by step:
+
+Example using ₦500 deposit:
+
+Flutterwave fee (raw): Calculate the real FLW fee — flat ₦10.75 for amounts ≤ ₦2,500; ₦26.88 for ≤ ₦50,000
+What user pays: Strip the kobo — take only the whole naira portion of the FLW fee using Math.floor(fee). User pays deposit + Math.floor(FLW_fee). Example: ₦500 + ₦10 = user pays ₦510
+FLW deducts its full actual fee including kobo from the ₦510 sent — so ₦510 − ₦10.75 = ₦499.25 arrives
+Admin fee: ₦20 for every ₦500 in the deposit. Formula: (deposit / 500) × 20. Examples: ₦500 → ₦20 admin, ₦1,000 → ₦40, ₦2,000 → ₦80, ₦10,000 → ₦400
+Amount credited to user's account: arrived_amount − admin_fee = ₦499.25 − ₦20 = ₦479.25 credited
+Both the Flutterwave fee and the admin fee are removed before crediting — the user's dashboard shows only what actually lands in their account
+Show the user a full breakdown before they confirm payment:
+
+Deposit amount: ₦500
+Flutterwave fee: ₦10 (shown as whole naira only, no kobo)
+Admin fee: ₦20
+Total to send: ₦510
+Amount you will receive: ₦479.25
+Backend — all calls to https://api.flutterwave.com/v3:
+Use secret key directly as Bearer token — Authorization: Bearer ${process.env.FLW_SECRET_KEY}. No OAuth, no token exchange.
+
+Bank transfer: POST /v3/charges?type=bank_transfer with { tx_ref, amount: String(totalToSend), email, currency: "NGN", fullname }. Account number is at response.meta.authorization.transfer_account, bank at response.meta.authorization.transfer_bank
+Card: POST /v3/payments — checkout link at response.data.link
+Verify bank transfer: GET /v3/transactions?tx_ref=... — confirmed when response.data[0].status === "successful"
+Verify card: GET /v3/transactions/{transactionId}/verify — confirmed when response.data.status === "successful" and tx_ref matches
+On confirmed payment: credit the calculated creditedAmount (not the deposit amount) to the user's balance in the database and return the new balance
+Frontend:
+
+Use flutterwave-react-v3 with useFlutterwave and closePaymentModal. Public key from import.meta.env.VITE_FLW_PUBLIC_KEY
+Bank transfer page: show account number with a copy button, bank name, bold warning to send the exact total amount only. Save session to localStorage (expire 2 hours) so the page survives if the user switches to their banking app and returns
+Confirming screen: spinning loader with "Confirming your payment..." text. Poll verify every 5 seconds up to 12 times (60 seconds). On success show the amount credited and the new balance, then redirect to dashboard. On timeout show a "Check again" button
+Update existing files only. The API keys are below for flutterwave and google map 
+Public key
+
+FLWPUBK-2e378f454905fb2ada407bb4d25997b1-X
+
+Secret key
+
+FLWSECK-174d5ee98b196a411854ecac8615095b-19eea189a20vt-X
+
+Encryption key
+
+174d5ee98b199f1e31de36c0
+
+Map API key
+
+AIzaSyDqiqGjWgegkccUj_dpPmiAhjJEb8iW_2w
