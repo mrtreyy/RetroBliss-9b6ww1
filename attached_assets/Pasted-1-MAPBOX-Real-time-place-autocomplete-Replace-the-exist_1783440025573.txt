@@ -1,0 +1,93 @@
+1. MAPBOX — Real-time place autocomplete  
+Replace the existing Google Maps implementation with Mapbox. Do not use @react-google-maps/api or Google Places Autocomplete anymore.
+
+Use Mapbox as the map provider. The Mapbox API key is already available in the codebase — use the existing key and do not ask for a new one or create another environment variable.
+
+Mapbox should provide a Google Maps–like experience:
+- Accurate world map coverage and location results similar to Google Maps.
+- Replace any existing search box with Mapbox real-time place autocomplete.
+- As the user types each letter, instantly display a dropdown showing matching place suggestions from anywhere in the world.
+- Suggestions must update on every keystroke.
+- Use Mapbox Geocoding API autocomplete/search functionality.
+- When the user selects a suggestion:
+  - Pan/animate the map to that location.
+  - Drop a marker on the selected location.
+  - Update the selected coordinates/location data.
+
+Default map center:
+- Lagos, Nigeria
+- Latitude: 6.5244
+- Longitude: 3.3792
+
+Remove all Google Maps API usage:
+- Remove Google Maps components.
+- Remove Google Places Autocomplete.
+- Remove Google Maps API key references.
+
+Only update the map-related files and functionality. Do not affect unrelated features.
+
+2. FLUTTERWAVE v3 PAYMENT SYSTEM  
+Update the existing payment system to work with Flutterwave v3. Credentials already stored as secrets: FLW_SECRET_KEY (FLWSECK-... format) and VITE_FLW_PUBLIC_KEY (FLWPUBK-... format).
+
+Deposit amounts: Minimum ₦500. Preset options only — no free text entry: ₦500, ₦1,000(50 charge and they get 950), ₦2,000(60 naira charge and they get 1940), ₦3,000, ₦4,000, ₦5,000, ₦6,000, ₦7,000, ₦8,000, ₦9,000, ₦10,000. Take 60 charge till 5000 and 100 till 10000 deposit,
+
+Fee calculation — implement exactly this logic, step by step:
+
+Example using ₦500 deposit:
+
+Flutterwave fee (raw): Calculate the real FLW fee — flat ₦10 for amounts ≤ ₦2,500; ₦26.88 for ≤ ₦50,000
+What user pays: Strip the kobo — take only the whole naira portion of the FLW fee using Math.floor(fee). User pays deposit + Math.floor(FLW_fee). Example: ₦500 + ₦10 = user pays ₦510
+FLW deducts its full actual fee including kobo from the ₦510 sent — so ₦510 − ₦10 = ₦500 arrives
+Admin fee: ₦20 for every ₦500 in the deposit. Formula: (deposit / 500) × 20. Examples: ₦500 → ₦20 admin, ₦1,000 → ₦40, ₦2,000 → ₦80, ₦10,000 → ₦400
+Amount credited to user's account: arrived_amount − admin_fee = ₦500 − ₦20 = 480 credited
+Both the Flutterwave fee and the admin fee are removed before crediting — the user's dashboard shows only what actually lands in their account
+
+Show the user a full breakdown before they confirm payment:
+
+Deposit amount: ₦500  
+Flutterwave fee: ₦10 (shown as whole naira only, no kobo)  
+Admin fee: ₦20  
+Total to send: ₦510  
+Amount you will receive: ₦480  
+
+Backend — all calls to https://api.flutterwave.com/v3:
+Use secret key directly as Bearer token — Authorization: Bearer ${process.env.FLW_SECRET_KEY}. No OAuth, no token exchange.
+
+Bank transfer: POST /v3/charges?type=bank_transfer with { tx_ref, amount: String(totalToSend), email, currency: "NGN", fullname }. Account number is at response.meta.authorization.transfer_account, bank at response.meta.authorization.transfer_bank
+
+Card: POST /v3/payments — checkout link at response.data.link
+
+Verify bank transfer: GET /v3/transactions?tx_ref=... — confirmed when response.data[0].status === "successful"
+
+Verify card: GET /v3/transactions/{transactionId}/verify — confirmed when response.data.status === "successful" and tx_ref matches
+
+On confirmed payment: credit the calculated creditedAmount (not the deposit amount) to the user's balance in the database and return the new balance
+
+Frontend:
+
+Use flutterwave-react-v3 with useFlutterwave and closePaymentModal. Public key from import.meta.env.VITE_FLW_PUBLIC_KEY
+
+Bank transfer page: show account number with a copy button, bank name, bold warning to send the exact total amount only. Save session to localStorage (expire 2 hours) so the page survives if the user switches to their banking app and returns
+
+Confirming screen: spinning loader with "Confirming your payment..." text. Poll verify every 5 seconds up to 6 times (60 seconds). On success show the amount credited and the new balance, then redirect to dashboard. On timeout show a "Check again" button
+
+Update existing files.
+
+IMPORTANT:
+- Do not touch the Flutterwave payment system while replacing Google Maps with Mapbox.
+- Do not modify payment calculations, backend payment routes, verification logic, or deposit flow.
+- Only change files required for the map migration.
+The API keys are below for flutterwave, mapbox key is in the retrobliss code. 
+Public key
+
+FLWPUBK-2e378f454905fb2ada407bb4d25997b1-X
+
+Secret key
+
+FLWSECK-174d5ee98b196a411854ecac8615095b-19eea189a20vt-X
+
+Encryption key
+
+174d5ee98b199f1e31de36c0
+
+When a rider logs into their account, it shouldn't auto request rides until they do it manually, when they request for a ride and it goes to it normal request screen and after the 10 seconds count down The ride request gets sent to all drivers and there a list of profile of all drivers show after the count down, their name, profile picture, location where they move if they’re close by, then it always shows online and each has a button where a rider can request for a ride again but the first time they request for a ride all driver gets notified of the active ride but when a ride request has already been accepted by a driver the request automatically shows inactive in the driver and ceo account and the accept ad decline button disappears for the driver and ceo, fix all errors in the driver and ceo account, add down buttons in the ceo account and their own respective pages, fix the problem with the backend where it does not recognize A driver/rider/ceo username or email and password login it does not validate the old one but only works one time when you reset the password, when a user creates an account their set login credentials email/username and password works consistently and persistent till either is changed, login credentials are always valid, no errors to it please, fix all other errors you noticed, for the rider account where there are to input their location for pickup and stop, when typing it should work like the google map autocomplete and stuff but only suggests and autocomplete the set available locations by the CEO. And add this you mentioned ", I can add a countdown timer on the bank transfer screen that shows the exact minutes and seconds remaining before the one-time account expires. Would you like me to do that?" the account number should work for 15 minutes so as the timer. Fix the issue with the map, and when the rider sends another request after 10 seconds count down the request button changes to pending, then if the ride gets accepted they should be notified inapp in notification panel and push app notification on their home scree or notification bar like other apps, fix the map!! And add the buttons you mentioned for the ceo, we are currently using google map fix it and do not switch to mapbox, stay on track with google map only. All page should have back button to go back. Each transfer the rider gets a different account number from flutterwave and tell them that they can only use the account number for payment once to avoid you know. Make no mistake please.

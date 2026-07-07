@@ -28,6 +28,7 @@ const DriverSignIn: React.FC<DriverSignInProps> = ({ onLogin, onSignUp, onBack, 
   const [forgotMode, setForgotMode] = useState<'off' | 'find' | 'reset'>('off');
   const [forgotId, setForgotId] = useState('');
   const [foundUserId, setFoundUserId] = useState('');
+  const [foundUserUsername, setFoundUserUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPwd, setConfirmNewPwd] = useState('');
 
@@ -52,7 +53,14 @@ const DriverSignIn: React.FC<DriverSignInProps> = ({ onLogin, onSignUp, onBack, 
       }
 
       const d = drivers[0];
-      const storedPwd = localStorage.getItem(`rb_pwd_${d.id}`);
+      let storedPwd = localStorage.getItem(`rb_pwd_${d.id}`);
+      // Fallback: check username-based key if ID-based is missing
+      if (storedPwd === null) {
+        storedPwd = localStorage.getItem(`rb_pwd_u_${d.username}`);
+        if (storedPwd !== null) {
+          localStorage.setItem(`rb_pwd_${d.id}`, storedPwd); // re-anchor under ID key
+        }
+      }
 
       if (storedPwd !== password) {
         setError('Username or password is incorrect. Please try again.');
@@ -113,8 +121,8 @@ const DriverSignIn: React.FC<DriverSignInProps> = ({ onLogin, onSignUp, onBack, 
     if (!forgotId.trim()) { setError('Enter your email or username.'); return; }
     setLoading(true); setError('');
     const q = forgotId.trim().toLowerCase();
-    const { data } = await supabase.from('rb_drivers').select('id').or(`username.eq.${q},email.eq.${q}`).limit(1);
-    if (data && data.length > 0) { setFoundUserId(data[0].id); setForgotMode('reset'); setLoading(false); return; }
+    const { data } = await supabase.from('rb_drivers').select('id,username').or(`username.eq.${q},email.eq.${q}`).limit(1);
+    if (data && data.length > 0) { setFoundUserId(data[0].id); setFoundUserUsername(data[0].username || ''); setForgotMode('reset'); setLoading(false); return; }
     setError('No driver account found with that email or username.');
     setLoading(false);
   };
@@ -123,7 +131,8 @@ const DriverSignIn: React.FC<DriverSignInProps> = ({ onLogin, onSignUp, onBack, 
     if (!newPassword || newPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
     if (newPassword !== confirmNewPwd) { setError('Passwords do not match.'); return; }
     localStorage.setItem(`rb_pwd_${foundUserId}`, newPassword);
-    setForgotMode('off'); setForgotId(''); setNewPassword(''); setConfirmNewPwd(''); setFoundUserId('');
+    if (foundUserUsername) localStorage.setItem(`rb_pwd_u_${foundUserUsername}`, newPassword);
+    setForgotMode('off'); setForgotId(''); setNewPassword(''); setConfirmNewPwd(''); setFoundUserId(''); setFoundUserUsername('');
     toast.success('Password reset! Sign in with your new password.');
   };
 

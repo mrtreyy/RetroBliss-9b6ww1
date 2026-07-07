@@ -141,6 +141,8 @@ const DriverSignUp: React.FC<DriverSignUpProps> = ({ onSignUp, onBack }) => {
 
       await supabase.from('rb_usernames').insert({ username: uname, role: 'driver', user_id: id, created_at: new Date().toISOString() });
       localStorage.setItem(`rb_pwd_${id}`, password);
+      // Also store under username key as durable fallback
+      localStorage.setItem(`rb_pwd_u_${uname}`, password);
 
       const ip = await getClientIP();
       await logAuditDB(uname, 'driver', 'signup', id, { email: email.trim().toLowerCase(), state, vehicle: `${vehicleYear} ${vehicleMake} ${vehicleModel}` }, ip, state);

@@ -75,6 +75,8 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
   const [scheduledRides, setScheduledRides] = useState<Record<string, unknown>[]>([]);
   const [editUsername, setEditUsername] = useState('');
   const [editPassword, setEditPassword] = useState('');
+  const [driverList, setDriverList] = useState<{id: string; name: string; profilePic?: string; lat: number; lng: number}[]>([]);
+  const [broadcastSent, setBroadcastSent] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -249,8 +251,8 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
         setSubView('active-ride');
         fetchMatchedDriver(ride.driverId);
       } else if (ride.status === 'searching') {
-        setSubView('matching');
-        startDriverSearchTimer(ride);
+        // Don't auto-resume searching rides on login — user must request again manually
+        setActiveRide(ride);
       }
     }
   };
@@ -339,7 +341,7 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
 
   const broadcastToAllDrivers = async (ride: Ride) => {
     // Get all active (approved) drivers
-    const { data: allDrivers } = await supabase.from('rb_drivers').select('id,full_name,latitude,longitude').eq('status', 'active');
+    const { data: allDrivers } = await supabase.from('rb_drivers').select('id,full_name,latitude,longitude,profile_pic').eq('status', 'active');
     if (!allDrivers || allDrivers.length === 0) {
       setShowPendingList(true);
       return;
@@ -373,6 +375,28 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
     toast.info('Request sent to all drivers! Waiting for acceptance...');
     setPendingRides(prev => [...prev, ride]);
     setShowPendingList(false);
+    // Store driver list for display on matching screen
+    setDriverList(sortedDrivers.map((d: Record<string, unknown>) => ({
+      id: d.id as string,
+      name: d.full_name as string,
+      profilePic: d.profile_pic as string | undefined,
+      lat: Number(d.latitude) || 6.5244,
+      lng: Number(d.longitude) || 3.3792,
+    })));
+    setBroadcastSent(true);
+  };
+
+  const handleRequestSpecificDriver = async (driverId: string) => {
+    if (!activeRide) return;
+    const driver = driverList.find(d => d.id === driverId);
+    if (!driver) return;
+    await sendNotification(
+      driverId, 'driver',
+      `🚨 Direct Ride Request`,
+      `${activeRide.pickup} → ${activeRide.destination} · ₦${activeRide.fare?.toLocaleString()}. Rider is requesting you specifically — accept now!`,
+      activeRide.id
+    );
+    toast.success(`Request sent directly to ${driver.name}!`);
   };
 
   const handleRequestRide = async () => {
@@ -420,6 +444,8 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
       return;
     }
 
+    setBroadcastSent(false);
+    setDriverList([]);
     setSearching(true);
     const rideId = generateId();
     const pickupCoords = getLocationCoords(pickupVal, activeStates) || [3.3792, 6.5244] as [number, number];
@@ -446,13 +472,8 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
     setSubView('matching');
     setSearching(false);
 
-    // Start 10-second timer — after it fires, redirect rider back to home
+    // Start 10-second countdown — after it fires, broadcast to all drivers
     startDriverSearchTimer(mappedRide);
-    // After 10s, redirect rider back to home dashboard
-    setTimeout(() => {
-      setSubView('home');
-      setSearching(false);
-    }, 11000);
   };
 
   const handleCancelRide = async () => {
@@ -461,6 +482,8 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
     await supabase.rpc('cancel_ride_with_refund', { p_ride_id: activeRide.id, p_cancelled_by: rider?.id || 'rider' });
     setActiveRide(null); setMatchedDriver(null); setDriverLocation(undefined);
     setSearchCountdown(0);
+    setBroadcastSent(false);
+    setDriverList([]);
     setSubView('home');
     toast.info('Ride cancelled.');
   };
@@ -727,7 +750,45 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
                 <button style={{ flex: 2, padding: '16px', borderRadius: '18px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 700, fontFamily: "'Poppins', sans-serif" }} onClick={() => { if (navigator.share) navigator.share({ title: 'My RetroBliss Ride', text: `I'm riding with ${matchedDriver.name} (${matchedDriver.plate})` }); else toast.success('Trip info copied!'); }}>Share Trip</button>
               </div>
             </div>
+          ) : broadcastSent ? (
+            /* After broadcast — show driver list, stay on screen */
+            <div style={{ width: '100%', maxWidth: '400px', animation: 'fadeInUp 0.4s ease' }}>
+              <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '10px' }}>📡</div>
+                <h2 style={{ color: 'white', fontSize: '22px', fontWeight: 800, margin: '0 0 6px' }}>Request Sent!</h2>
+                <div style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '14px', padding: '8px 16px', display: 'inline-block', marginBottom: '8px' }}>
+                  <p style={{ color: '#C4B5FD', fontSize: '13px', fontWeight: 700, margin: 0 }}>⏳ Pending — Waiting for a driver to accept...</p>
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: 0 }}>All nearby drivers have been notified. Tap any driver below to send a direct request.</p>
+              </div>
+              <div style={{ overflowY: 'auto', maxHeight: '48vh' }}>
+                {driverList.length > 0 ? driverList.map(d => (
+                  <div key={d.id} className="glass-card" style={{ padding: '12px 16px', marginBottom: '8px', borderRadius: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <ProfileAvatar name={d.name} profilePic={d.profilePic} size={44} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ color: 'white', fontSize: '14px', fontWeight: 700, margin: 0 }}>{d.name}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>Online</span>
+                      </div>
+                    </div>
+                    <button onClick={() => handleRequestSpecificDriver(d.id)} style={{ padding: '8px 14px', borderRadius: '12px', background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', border: 'none', color: 'white', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: "'Poppins', sans-serif", flexShrink: 0 }}>
+                      Request
+                    </button>
+                  </div>
+                )) : (
+                  <div style={{ textAlign: 'center', padding: '28px' }}>
+                    <p style={{ fontSize: '36px', margin: '0 0 8px' }}>🚫</p>
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>No drivers online right now.</p>
+                  </div>
+                )}
+              </div>
+              <button onClick={handleCancelRide} style={{ width: '100%', padding: '14px', borderRadius: '16px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: "'Poppins', sans-serif", marginTop: '10px' }}>
+                ✕ Cancel Request
+              </button>
+            </div>
           ) : (
+            /* Still counting down */
             <div style={{ textAlign: 'center', width: '100%', maxWidth: '360px', animation: 'fadeInUp 0.5s ease' }}>
               <h2 style={{ color: 'white', fontSize: '32px', fontWeight: 800, margin: '0 0 8px', lineHeight: 1.2 }}>Finding you<br />a driver...</h2>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px', margin: '0 0 28px' }}>Sit tight! We're finding the best driver for you.</p>

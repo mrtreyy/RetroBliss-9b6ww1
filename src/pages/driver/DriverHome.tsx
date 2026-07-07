@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import MapboxMap from '@/components/MapboxMap';
+import GoogleMapComponent from '@/components/GoogleMap';
 import NotificationSystem from '@/components/NotificationSystem';
 import ProfileAvatar from '@/components/ProfileAvatar';
 import ChatSupport from '@/pages/ChatSupport';
@@ -351,9 +351,9 @@ const DriverHome: React.FC<DriverHomeProps> = ({ driver, onLogout, onUpdateDrive
       <div style={{ minHeight: '100vh', background: '#080612', display: 'flex', flexDirection: 'column', fontFamily: "'Poppins', sans-serif" }}>
         <NotificationSystem userId={driver.id} userRole="driver" />
         <div style={{ position: 'relative', flex: 1 }}>
-          <MapboxMap
+          <GoogleMapComponent
             height="100%"
-            center={driverLocation || pickupC}
+            center={{ lat: (driverLocation || pickupC)[1], lng: (driverLocation || pickupC)[0] }}
             zoom={13}
             activeRideRoute={{ pickup: pickupC, destination: destC, driver: driverLocation || undefined }}
             mode="driver"
@@ -670,9 +670,9 @@ const DriverHome: React.FC<DriverHomeProps> = ({ driver, onLogout, onUpdateDrive
         )}
 
         {/* Map */}
-        <MapboxMap
+        <GoogleMapComponent
           height={260}
-          center={driverCoords}
+          center={{ lat: driverCoords[1], lng: driverCoords[0] }}
           zoom={12}
           mode="driver"
           markers={driverLocation ? [{ id: 'my-location', lat: driverLocation[1], lng: driverLocation[0], label: 'You', color: '#22C55E' }] : []}

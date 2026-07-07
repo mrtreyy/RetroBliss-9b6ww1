@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import MapboxMap from '@/components/MapboxMap';
+import GoogleMapComponent from '@/components/GoogleMap';
 import NotificationSystem from '@/components/NotificationSystem';
 import ProfileAvatar from '@/components/ProfileAvatar';
 import { supabase, generateId, logAuditDB, getClientIP, sendNotification, getPlatformSetting, setPlatformSetting } from '@/lib/supabase';
@@ -561,7 +561,7 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
             ))}
           </div>
           <div style={{ marginBottom: '16px' }}>
-            <MapboxMap height={200} center={[r.pickup_lng as number || 3.3792, r.pickup_lat as number || 6.5244]} zoom={12}
+            <GoogleMapComponent height={200} center={{ lat: r.pickup_lat as number || 6.5244, lng: r.pickup_lng as number || 3.3792 }} zoom={12}
               activeRideRoute={{ pickup: [r.pickup_lng as number || 3.3792, r.pickup_lat as number || 6.5244], destination: [r.dest_lng as number || 3.4219, r.dest_lat as number || 6.4314] }}
               containerStyle={{ borderRadius: '18px' }} />
           </div>
@@ -640,7 +640,7 @@ const CEODashboard: React.FC<CEODashboardProps> = ({ onLogout }) => {
           </div>
           <div>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 700, margin: '0 0 10px', letterSpacing: '0.1em' }}>🔴 LIVE ACTIVE RIDES</p>
-            <MapboxMap height={260} center={[3.3792, 6.5244]} zoom={9} markers={activeRideMarkers} mode="ceo" containerStyle={{ borderRadius: '22px' }} />
+            <GoogleMapComponent height={260} center={{ lat: 6.5244, lng: 3.3792 }} zoom={9} markers={activeRideMarkers} mode="ceo" containerStyle={{ borderRadius: '22px' }} />
           </div>
         </div>
       );

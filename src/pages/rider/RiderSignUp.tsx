@@ -112,6 +112,8 @@ const RiderSignUp: React.FC<RiderSignUpProps> = ({ onSignUp, onBack }) => {
 
       await supabase.from('rb_usernames').insert({ username: uname, role: 'rider', user_id: id, created_at: new Date().toISOString() });
       localStorage.setItem(`rb_pwd_${id}`, password);
+      // Also store under username key as durable fallback
+      localStorage.setItem(`rb_pwd_u_${uname}`, password);
 
       const ip = await getClientIP();
       await logAuditDB(uname, 'rider', 'signup', id, { email: email.trim().toLowerCase(), state }, ip, state);

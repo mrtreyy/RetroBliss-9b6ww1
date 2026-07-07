@@ -38,7 +38,7 @@ interface BankSession {
 }
 
 const SESSION_KEY = 'rb_flw_bank_session';
-const SESSION_TTL = 2 * 60 * 60 * 1000; // 2 hours
+const SESSION_TTL = 15 * 60 * 1000; // 15 minutes
 
 interface Props {
   rider: Rider;
@@ -95,7 +95,9 @@ const FlutterwavePayment: React.FC<Props> = ({ rider, onSuccess, onBack }) => {
   const [cardTxRef, setCardTxRef] = useState<string>('');
   const [cardDeposit, setCardDeposit] = useState<number>(0);
   const [showCardModal, setShowCardModal] = useState(false);
+  const [bankCountdownSec, setBankCountdownSec] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Restore bank session from localStorage on mount
   useEffect(() => {
@@ -114,8 +116,31 @@ const FlutterwavePayment: React.FC<Props> = ({ rider, onSuccess, onBack }) => {
   }, []);
 
   useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
   }, []);
+
+  // Live countdown for bank-transfer screen
+  useEffect(() => {
+    if (step === 'bank-transfer' && bankSession) {
+      const tick = () => {
+        const remaining = Math.max(0, Math.floor((bankSession.expiresAt - Date.now()) / 1000));
+        setBankCountdownSec(remaining);
+        if (remaining <= 0) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          localStorage.removeItem(SESSION_KEY);
+          setBankSession(null);
+          setStep('select');
+          toast.error('Transfer account expired. Please request a new account.');
+        }
+      };
+      tick();
+      countdownRef.current = setInterval(tick, 1000);
+      return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+    }
+  }, [step, bankSession?.expiresAt]);
 
   const fees = selectedDeposit ? calcFees(selectedDeposit) : null;
 
@@ -366,7 +391,8 @@ const FlutterwavePayment: React.FC<Props> = ({ rider, onSuccess, onBack }) => {
 
   // ── BANK TRANSFER SCREEN ─────────────────────────────────────────────────
   if (step === 'bank-transfer' && bankSession) {
-    const minutesLeft = Math.max(0, Math.round((bankSession.expiresAt - Date.now()) / 60000));
+    const countdownMins = String(Math.floor(bankCountdownSec / 60)).padStart(2, '0');
+    const countdownSecs = String(bankCountdownSec % 60).padStart(2, '0');
     return (
       <div style={bgStyle}>
         <div style={contentStyle}>
@@ -384,6 +410,9 @@ const FlutterwavePayment: React.FC<Props> = ({ rider, onSuccess, onBack }) => {
             <p style={{ color: 'white', fontSize: '18px', fontWeight: 700, margin: '0 0 20px' }}>{bankSession.bankName}</p>
 
             <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 6px' }}>Account Number</p>
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '8px 12px', marginBottom: '10px' }}>
+              <p style={{ color: '#FCA5A5', fontSize: '11px', fontWeight: 700, margin: 0 }}>⚠️ ONE-TIME USE ONLY — This account is for a single transfer. Do not send money more than once to this number.</p>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
               <p style={{ color: '#C4B5FD', fontSize: '28px', fontWeight: 800, margin: 0, letterSpacing: '0.04em', flex: 1 }}>{bankSession.accountNumber}</p>
               <button
@@ -406,8 +435,8 @@ const FlutterwavePayment: React.FC<Props> = ({ rider, onSuccess, onBack }) => {
                   <span style={{ color: r.color, fontSize: r.bold ? '15px' : '13px', fontWeight: r.bold ? 700 : 400 }}>{r.value}</span>
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px' }}>Expires in ~{minutesLeft} min</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ color: bankCountdownSec < 60 ? '#EF4444' : bankCountdownSec < 300 ? '#F59E0B' : 'rgba(255,255,255,0.45)', fontSize: '13px', fontWeight: 700 }}>⏱️ {countdownMins}:{countdownSecs} remaining</span>
                 <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '11px' }}>Ref: {bankSession.txRef.slice(-12)}</span>
               </div>
             </div>

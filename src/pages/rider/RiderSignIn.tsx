@@ -26,6 +26,7 @@ const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, on
   const [forgotMode, setForgotMode] = useState<'off' | 'find' | 'reset'>('off');
   const [forgotId, setForgotId] = useState('');
   const [foundUserId, setFoundUserId] = useState('');
+  const [foundUserUsername, setFoundUserUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPwd, setConfirmNewPwd] = useState('');
 
@@ -50,7 +51,14 @@ const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, on
       }
 
       const r = riders[0];
-      const storedPwd = localStorage.getItem(`rb_pwd_${r.id}`);
+      let storedPwd = localStorage.getItem(`rb_pwd_${r.id}`);
+      // Fallback: check username-based key if ID-based is missing (cross-device / cleared storage)
+      if (storedPwd === null) {
+        storedPwd = localStorage.getItem(`rb_pwd_u_${r.username}`);
+        if (storedPwd !== null) {
+          localStorage.setItem(`rb_pwd_${r.id}`, storedPwd); // re-anchor under ID key
+        }
+      }
 
       if (storedPwd !== password) {
         setError('Username or password is incorrect. Please try again.');
@@ -100,6 +108,7 @@ const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, on
     const { data: riderData } = await supabase.from('rb_riders').select('id,email,username').or(`username.eq.${q},email.eq.${q}`).limit(1);
     if (riderData && riderData.length > 0) {
       setFoundUserId(riderData[0].id);
+      setFoundUserUsername(riderData[0].username || '');
       setForgotMode('reset');
       setLoading(false);
       return;
@@ -112,7 +121,8 @@ const RiderSignIn: React.FC<RiderSignInProps> = ({ onLogin, onSignUp, onBack, on
     if (!newPassword || newPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
     if (newPassword !== confirmNewPwd) { setError('Passwords do not match.'); return; }
     localStorage.setItem(`rb_pwd_${foundUserId}`, newPassword);
-    setForgotMode('off'); setForgotId(''); setNewPassword(''); setConfirmNewPwd(''); setFoundUserId('');
+    if (foundUserUsername) localStorage.setItem(`rb_pwd_u_${foundUserUsername}`, newPassword);
+    setForgotMode('off'); setForgotId(''); setNewPassword(''); setConfirmNewPwd(''); setFoundUserId(''); setFoundUserUsername('');
     toast.success('Password reset! You can now sign in with your new password.');
   };
 

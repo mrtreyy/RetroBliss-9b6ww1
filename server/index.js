@@ -109,6 +109,6 @@ app.post('/api/flw/credit-wallet', async (req, res) => {
   }
 });
 
-app.listen(3001, 'localhost', () => {
-  console.log('[RetroBliss] Payment server running on localhost:3001');
+app.listen(3001, '0.0.0.0', () => {
+  console.log('[RetroBliss] Payment server running on port 3001');
 });
