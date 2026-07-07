@@ -68,3 +68,5 @@ publicDir = "dist"
 [userenv.shared]
 VITE_GOOGLE_MAPS_KEY = "AIzaSyDqiqGjWgegkccUj_dpPmiAhjJEb8iW_2w"
 VITE_FLW_PUBLIC_KEY = "FLWPUBK-2e378f454905fb2ada407bb4d25997b1-X"
+VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzbG54cWxzZ2V6eXBvY2prc2dtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MzY4MzUsImV4cCI6MjA5OTAxMjgzNX0.fb0uDop0xLOCzBQbWX91ACjJNUr8kCnY2uP733UiHEg"
+VITE_SUPABASE_URL = "https://kslnxqlsgezypocjksgm.supabase.co"

@@ -78,6 +78,7 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
   const [driverList, setDriverList] = useState<{id: string; name: string; profilePic?: string; lat: number; lng: number}[]>([]);
   const [broadcastSent, setBroadcastSent] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!rider) return;
