@@ -1,0 +1,2 @@
+- [RiderHome timer pattern](rider-home-timer.md) — search timer needs two refs (interval + timeout); cancel must clear both before any async DB call.
+- [Supabase project](supabase-project.md) — project URL and anon key are set; env var names are VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.

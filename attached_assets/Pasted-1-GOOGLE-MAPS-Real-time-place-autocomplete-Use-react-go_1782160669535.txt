@@ -39,15 +39,15 @@ Confirming screen: spinning loader with "Confirming your payment..." text. Poll 
 Update existing files only. The API keys are below for flutterwave and google map 
 Public key
 
-FLWPUBK-2e378f454905fb2ada407bb4d25997b1-X
+[REDACTED — stored as VITE_FLW_PUBLIC_KEY secret]
 
 Secret key
 
-FLWSECK-174d5ee98b196a411854ecac8615095b-19eea189a20vt-X
+[REDACTED — stored as FLW_SECRET_KEY secret]
 
 Encryption key
 
-174d5ee98b199f1e31de36c0
+[REDACTED — FLW encryption key]
 
 Map API key
 

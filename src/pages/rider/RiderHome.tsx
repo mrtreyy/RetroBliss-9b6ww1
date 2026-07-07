@@ -158,6 +158,7 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
       clearInterval(balancePoll);
       clearInterval(reminderPoll);
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
       supabase.removeChannel(rideChannel);
       supabase.removeChannel(driverLocChannel);
       supabase.removeChannel(notifChannel);
@@ -326,6 +327,10 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
 
   // 10-second driver search logic
   const startDriverSearchTimer = (ride: Ride) => {
+    // Clear any stale timers from a previous request
+    if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+
     let countdown = 10;
     setSearchCountdown(countdown);
     const interval = setInterval(() => {
@@ -333,18 +338,27 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
       setSearchCountdown(countdown);
       if (countdown <= 0) {
         clearInterval(interval);
+        searchIntervalRef.current = null;
         // After 10 seconds, broadcast to ALL drivers
         broadcastToAllDrivers(ride);
       }
     }, 1000);
-    searchTimerRef.current = setTimeout(() => clearInterval(interval), 12000);
+    searchIntervalRef.current = interval;
+    // Safety fallback: forcibly clear the interval after 12 s
+    searchTimerRef.current = setTimeout(() => {
+      clearInterval(interval);
+      searchIntervalRef.current = null;
+    }, 12000);
   };
 
   const broadcastToAllDrivers = async (ride: Ride) => {
     // Get all active (approved) drivers
     const { data: allDrivers } = await supabase.from('rb_drivers').select('id,full_name,latitude,longitude,profile_pic').eq('status', 'active');
     if (!allDrivers || allDrivers.length === 0) {
-      setShowPendingList(true);
+      // No drivers online — surface the empty-driver screen (broadcastSent branch with empty list)
+      setDriverList([]);
+      setBroadcastSent(true);
+      toast.info('No drivers are online right now. You can cancel and try again later.');
       return;
     }
 
@@ -479,6 +493,9 @@ const RiderHome: React.FC<RiderHomeProps> = ({ rider, onLogout, onUpdateRider })
 
   const handleCancelRide = async () => {
     if (!activeRide) return;
+    // Stop any running search timers immediately before the async DB call
+    if (searchIntervalRef.current) { clearInterval(searchIntervalRef.current); searchIntervalRef.current = null; }
+    if (searchTimerRef.current) { clearTimeout(searchTimerRef.current); searchTimerRef.current = null; }
     // Use atomic cancel function
     await supabase.rpc('cancel_ride_with_refund', { p_ride_id: activeRide.id, p_cancelled_by: rider?.id || 'rider' });
     setActiveRide(null); setMatchedDriver(null); setDriverLocation(undefined);

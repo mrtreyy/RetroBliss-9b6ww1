@@ -80,14 +80,14 @@ IMPORTANT:
 The API keys are below for flutterwave, mapbox key is in the retrobliss code. 
 Public key
 
-FLWPUBK-2e378f454905fb2ada407bb4d25997b1-X
+[REDACTED — stored as VITE_FLW_PUBLIC_KEY secret]
 
 Secret key
 
-FLWSECK-174d5ee98b196a411854ecac8615095b-19eea189a20vt-X
+[REDACTED — stored as FLW_SECRET_KEY secret]
 
 Encryption key
 
-174d5ee98b199f1e31de36c0
+[REDACTED — FLW encryption key]
 
 When a rider logs into their account, it shouldn't auto request rides until they do it manually, when they request for a ride and it goes to it normal request screen and after the 10 seconds count down The ride request gets sent to all drivers and there a list of profile of all drivers show after the count down, their name, profile picture, location where they move if they’re close by, then it always shows online and each has a button where a rider can request for a ride again but the first time they request for a ride all driver gets notified of the active ride but when a ride request has already been accepted by a driver the request automatically shows inactive in the driver and ceo account and the accept ad decline button disappears for the driver and ceo, fix all errors in the driver and ceo account, add down buttons in the ceo account and their own respective pages, fix the problem with the backend where it does not recognize A driver/rider/ceo username or email and password login it does not validate the old one but only works one time when you reset the password, when a user creates an account their set login credentials email/username and password works consistently and persistent till either is changed, login credentials are always valid, no errors to it please, fix all other errors you noticed, for the rider account where there are to input their location for pickup and stop, when typing it should work like the google map autocomplete and stuff but only suggests and autocomplete the set available locations by the CEO. And add this you mentioned ", I can add a countdown timer on the bank transfer screen that shows the exact minutes and seconds remaining before the one-time account expires. Would you like me to do that?" the account number should work for 15 minutes so as the timer. Fix the issue with the map, and when the rider sends another request after 10 seconds count down the request button changes to pending, then if the ride gets accepted they should be notified inapp in notification panel and push app notification on their home scree or notification bar like other apps, fix the map!! And add the buttons you mentioned for the ceo, we are currently using google map fix it and do not switch to mapbox, stay on track with google map only. All page should have back button to go back. Each transfer the rider gets a different account number from flutterwave and tell them that they can only use the account number for payment once to avoid you know. Make no mistake please.
